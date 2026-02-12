@@ -47,3 +47,6 @@ Ros2-Examples/
 ## Contributing
 
 See the [contribution guide](wiki/CONTRIBUTING) to see how you can contribute!
+
+## fast build
+colcon build --symlink-install --packages-skip zed_debug
