@@ -4,7 +4,7 @@ venv/
 
 # Compiled Python Files
 __pycach__/
-
+__pycache__/
 # IDE files
 .vscode/
 *.swp
