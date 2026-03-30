@@ -35,7 +35,7 @@ class PathPlanner(Node):
         for i in range (y - self.r, y + self.r + 1):
             for j in range (x - self.r, x + self.r + 1):
                 position = (i, j)
-                if self.point_in_map(self, position) and (self.map[i][j] != 0):
+                if self.point_in_map(position) and (self.map[i][j] != 0):
                     found = True
                     break
         
@@ -65,9 +65,9 @@ class PathPlanner(Node):
         
         for i, j in dir:
             next = (y + i, x + j)
-            if self.point_in_map(self, next) and not (next in checked or self.find_obstacle(self, next)):
+            if self.point_in_map(next) and not (next in checked or self.find_obstacle(next)):
                 manhattan = abs(next[0] - end[0]) + abs(next[1] - end[1])
-                cost = manhattan + len(self.pathfind(self, start, expanded))
+                cost = manhattan + len(self.pathfind(start, expanded))
                 unexpanded.append([cost, next, position])
                 checked.append(next)
             
