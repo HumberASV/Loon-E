@@ -36,7 +36,14 @@ Ros2-Examples/
 ├── build/                       # Colcon intermediate files
 ├── install/                     # Colcon package installation
 ├── log/                         # Colcon Logging information
-├── src/                         # Source code
+├── src/                         # Source packages
+│   ├── loon-e-coms/             # Loon-E Base Station communication
+│   ├── loon-e-control/          # Loon-E Control Code
+│   ├── loon-e-map/              # Loon-E Mapping Code
+│   ├── loon-e-motor/            # Loon-E Motor Code
+│   ├── loon-e-planning/         # Loon-E Planning Code
+│   ├── zed-ros2-examples/       # Zedx example testing code
+│   ├── zed-ros2-wrapper/        # Zedx wrapper (required for vision)
 ├── wiki/                        # Additional documentation
 │   ├── setup/                   # Setup documentation
 │   └── CONTRIBUTING.md/         # Instructions on contributing to this repository
