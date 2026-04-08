@@ -143,6 +143,9 @@ class Communications(Node):
             "data": <data>,
             "timestamp": <timestamp in nanoseconds>
             }
+        Parameters:
+            topic_key (str): Key to look up the MQTT topic from configuration
+            data: The data to publish (will be JSON-encoded)
         """
         try:
             if topic_key not in self.mqtt_topics:

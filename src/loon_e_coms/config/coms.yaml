@@ -1,7 +1,7 @@
 # TCP Configuration for Communications Node
 mqtt:
   broker:
-    host: "100.115.12.28"
+    host: "100.100.136.46"
     port: 1883
   topics:
     destination: "loon-e/destination"
