@@ -17,7 +17,8 @@ build_all(){
 
 build_loone(){
   echo "Building only Loon-E packages..."
-  colcon build --symlink-install --packages-select loon_e_coms loon_e_control loon_e_motor loon_e_planning loon_e_map
+  colcon build --symlink-install --packages-select loon_e_coms loon_e_control loon_e_motor loon_e_planning loon_e_map && \
+  source install/setup.bash
 }
 
 parse_arguements(){

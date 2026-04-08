@@ -1,7 +1,7 @@
-# MQTT Configuration for Communications Node
+# TCP Configuration for Communications Node
 mqtt:
   broker:
-    host: "localhost"
+    host: "100.115.12.28"
     port: 1883
   topics:
     destination: "loon-e/destination"
@@ -11,6 +11,7 @@ mqtt:
     objects: "loon-e/objects"
     locations: "loon-e/locations"
     obstacles: "loon-e/obstacles"
+    rosout: "loon-e/rosout"
   client:
     id: "loon-e-coms-client"
     keepalive: 60
