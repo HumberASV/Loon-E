@@ -1,7 +1,7 @@
 import numpy as np
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import UInt8MultiArray
+from std_msgs import UInt8MultiArray
 
 class Mapper(Node):
     def __init__(self):
@@ -19,7 +19,6 @@ class Mapper(Node):
         self.objects = []
         self.locations = []
         self.map = []
-        
         
     def getCell(self, meter):
         cell = int(meter/self.resolution)
