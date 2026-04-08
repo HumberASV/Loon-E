@@ -131,7 +131,7 @@ class Communications(Node):
     def on_mqtt_disconnect(self, client, userdata, rc) -> None:
         """Callback when MQTT client disconnects"""
         if rc != 0:
-            self.get_logger().warn(f"[coms] Unexpected MQTT disconnection with code {rc}")
+            self.get_logger().warning(f"[coms] Unexpected MQTT disconnection with code {rc}")
         else:
             self.get_logger().info("[coms] MQTT client disconnected")
     
