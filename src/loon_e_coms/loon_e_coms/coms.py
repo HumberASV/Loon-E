@@ -57,8 +57,8 @@ class Communications(Node):
             config_dir = get_package_share_directory('loon_e_coms')
             config_path = Path(config_dir) / "config" / "coms.yaml"
         except:
-            # Fall back to source directory
-            config_path = Path(__file__).parent.parent.parent / "config" / "coms.yaml"
+            # Fall back to this package's source directory
+            config_path = Path(__file__).resolve().parent.parent / "config" / "coms.yaml"
         
         with open(config_path, 'r') as config_file:
             self.config = yaml.safe_load(config_file)
