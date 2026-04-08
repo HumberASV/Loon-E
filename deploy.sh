@@ -6,6 +6,8 @@ DEPLOY_DIR="/root/ros2_ws/src"
 
 read -p "Do you want to deploy to "$DEPLOY_DIR"?" confirm
 if [[ "$confirm" == "y" || "$confirm" == "Y" ]]; then
+    mkdir -p "$HOME/.ros"
+    cp -rf cyclonedds.xml "$HOME/.ros/cyclonedds.xml" # Copy the Cyclone DDS configuration file to the ROS config directory
     cp -rf "$SRC_DIR"/* "$DEPLOY_DIR"
     echo "Copying contents of "$SRC_DIR" to "$DEPLOY_DIR"..."
     cd /root/ros2_ws
