@@ -1,0 +1,17 @@
+# MQTT Configuration for Communications Node
+mqtt:
+  broker:
+    host: "localhost"
+    port: 1883
+  topics:
+    destination: "loon-e/destination"
+    pwm: "loon-e/pwm"
+    path: "loon-e/path"
+    map: "loon-e/map"
+    objects: "loon-e/objects"
+    locations: "loon-e/locations"
+    obstacles: "loon-e/obstacles"
+  client:
+    id: "loon-e-coms-client"
+    keepalive: 60
+    qos: 1  # Quality of Service (0, 1, or 2)
