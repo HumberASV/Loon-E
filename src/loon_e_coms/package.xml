@@ -2,14 +2,15 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>loon_e_coms</name>
-  <version>0.0.0</version>
-  <description>TODO: Package description</description>
+  <version>1.0.0</version>
+  <description>This node handles all inter-node communication within the ROS ecosystem and also interfaces with external systems via MQTT.</description>
   <maintainer email="50027005+TheFujirose@users.noreply.github.com">admin</maintainer>
   <license>MIT</license>
 
   <depend>rclpy</depend>
   <depend>std_msgs</depend>
   <depend>rcl_interfaces</depend>
+  
   <exec_depend>python3-pip</exec_depend>
   <exec_depend>ament_index_python</exec_depend>
   

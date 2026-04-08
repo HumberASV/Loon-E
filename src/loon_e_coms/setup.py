@@ -17,7 +17,7 @@ setup(
     zip_safe=True,
     maintainer='admin',
     maintainer_email='50027005+TheFujirose@users.noreply.github.com',
-    description='TODO: Package description',
+    description='This node handles all inter-node communication within the ROS ecosystem and also interfaces with external systems via MQTT.',
     license='MIT',
     extras_require={
         'test': [
