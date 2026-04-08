@@ -21,7 +21,7 @@ build_loone(){
   source install/setup.bash
 }
 
-parse_arguements(){
+parse_arguments(){
   case "${1:-}" in
     -a|--all)
     build_all
@@ -36,4 +36,4 @@ parse_arguements(){
   esac
 }
 
-parse_arguements "$@"
+parse_arguments "$@"
