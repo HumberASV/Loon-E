@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'map_publisher = loon_e_map.map_publisher:main',
+            'map_publisher = loon-e-map.mapping_ROS:main',
         ],
     },
 )
