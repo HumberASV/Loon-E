@@ -10,6 +10,7 @@ setup(
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        ('share/' + package_name + '/launch', ['launch/coms_launch.py']),
         ('share/' + package_name + '/config', ['config/coms.yaml']),
     ],
     install_requires=['setuptools', 'paho-mqtt>=1.6.1', 'PyYAML>=5.3'],
@@ -25,7 +26,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'coms = loon_e_coms.Coms:main',
+            'coms = loon_e_coms.coms:main',
         ],
     },
 )

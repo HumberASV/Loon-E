@@ -4,7 +4,7 @@
   <name>loon-e-control</name>
   <version>0.2.0</version>
   <description>Control package for Loon-E</description>
-  <maintainer email="50027005+TheFujirose@users.noreply.github.com">admin</maintainer>
+  <maintainer email="amelia.soon@hotmail.com">admin</maintainer>
   <license>MIT</license>
 
   <test_depend>ament_copyright</test_depend>
