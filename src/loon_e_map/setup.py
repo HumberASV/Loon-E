@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'loon-e-map'
+package_name = 'loon_e_map'
 
 setup(
     name=package_name,
@@ -14,8 +14,8 @@ setup(
     install_requires=['setuptools'],
     zip_safe=True,
     maintainer='admin',
-    maintainer_email='50027005+TheFujirose@users.noreply.github.com',
-    description='TODO: Package description',
+    maintainer_email='amelia.soon@hotmail.com',
+    description='Mapping Node',
     license='MIT',
     extras_require={
         'test': [
@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'map_publisher = loon-e-map.mapping_ROS:main',
+            'map_publisher = loon_e_map.mapping_ROS:main',
         ],
     },
 )

@@ -16,7 +16,8 @@ build_all(){
 }
 
 build_loone(){
-  colcon build --symlink-install --packages-select loon-e-coms loon-e-control loon-e-motor loon-e-planning loon-e-map
+  echo "Building only Loon-E packages..."
+  colcon build --symlink-install --packages-select loon_e_coms loon_e_control loon_e_motor loon_e_planning loon_e_map
 }
 
 parse_arguements(){
@@ -33,3 +34,5 @@ parse_arguements(){
     ;;
   esac
 }
+
+parse_arguements "$@"

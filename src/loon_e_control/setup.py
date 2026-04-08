@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'loon-e-control'
+package_name = 'loon_e_control'
 
 setup(
     name=package_name,

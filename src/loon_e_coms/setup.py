@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'loon-e-coms'
+package_name = 'loon_e_coms'
 
 setup(
     name=package_name,

@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'loon-e-motor'
+package_name = 'loon_e_motor'
 
 setup(
     name=package_name,

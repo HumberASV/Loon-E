@@ -1,6 +1,6 @@
 from setuptools import find_packages, setup
 
-package_name = 'loon-e-planning'
+package_name = 'loon_e_planning'
 
 setup(
     name=package_name,
