@@ -7,13 +7,6 @@ Loon-E boat's public repo
 - Install ROS 2 following [installation](https://docs.ros.org/en/humble/Installation.html) page.
 - Set up your environment following [instructions](./wiki/setup/ENV.md) document.
 - Install colcon following [instructions](./wiki/setup/COLCON.md) document.
-- Install or setup a basestation with mosquitto
-
-#### Basic Mosquitto config and Launch
-```
-listener 1883
-allow_anonymous true
-```
 
 ## Development
 
@@ -44,11 +37,11 @@ Ros2-Examples/
 ├── install/                     # Colcon package installation
 ├── log/                         # Colcon Logging information
 ├── src/                         # Source packages
-│   ├── loon_e_coms/             # Loon-E Base Station communication
-│   ├── loon_e_control/          # Loon-E Control Code
-│   ├── loon_e_map/              # Loon-E Mapping Code
-│   ├── loon_e_motor/            # Loon-E Motor Code
-│   ├── loon_e_planning/         # Loon-E Planning Code
+│   ├── loon-e-coms/             # Loon-E Base Station communication
+│   ├── loon-e-control/          # Loon-E Control Code
+│   ├── loon-e-map/              # Loon-E Mapping Code
+│   ├── loon-e-motor/            # Loon-E Motor Code
+│   ├── loon-e-planning/         # Loon-E Planning Code
 │   ├── zed-ros2-examples/       # Zedx example testing code
 │   ├── zed-ros2-wrapper/        # Zedx wrapper (required for vision)
 ├── wiki/                        # Additional documentation

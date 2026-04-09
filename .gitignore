@@ -2,8 +2,6 @@
 venv/
 .venv/
 
-#isaac ros
-src/isaac_ros_assets
 # Compiled Python Files
 __pycach__/
 __pycache__/
