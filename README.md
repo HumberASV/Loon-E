@@ -1,0 +1,67 @@
+# Loon-E
+[Humber ASV](https://humberasv.ca/)'s Autonomous Surface Vehicle (ASV) project: Loon-E.
+The boat's public colcon package, containing the code for the boat's various systems, including control, mapping, planning, and communication.
+
+# Technology
+
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| Ubuntu Jammy | 22.04 | Operating system for development and deployment. |
+| ROS 2 Humble Hawksbill | 2.0 | Robotics middleware for communication between different components of the system. |
+| ZED SDK | 5.2 | Software Development Kit for the ZED stereo camera, used for vision processing. |
+
+### Prerequisites
+
+- Install ROS 2 following [installation](https://docs.ros.org/en/humble/Installation.html) page.
+- Set up your environment following [instructions](./wiki/setup/ENV.md) document.
+- Install colcon following [instructions](./wiki/setup/COLCON.md) document.
+
+## Development
+
+### Building Workspace
+
+Ensure you have set up your environment following [instructions](./wiki/setup/ENV.md) document, and have installed `colcon` following [this instructions](./wiki/setup/COLCON.md).
+
+For building the workspace with Windows see the below note: Building with Windows.
+
+Regardless of Linux or macOs distrubution, navigate to the project root `PROJECT-NAME/` and run `colcon build`. It may be needed to use the option `--symlink-install` as some build types do not support `devel` spaces.
+
+For more information on `catkin`'s `devel` space read [this documentation](https://catkin-tools.readthedocs.io/en/latest/advanced/linked_develspace.html).
+
+```bash
+colcon build --symlink-install
+```
+
+You can test it with the following command:
+
+```bash
+colon test --symlink-install
+```
+### Project Structure
+
+```text
+Ros2-Examples/
+├── build/                       # Colcon intermediate files
+├── install/                     # Colcon package installation
+├── log/                         # Colcon Logging information
+├── src/                         # Source packages
+│   ├── loon-e-coms/             # Loon-E Base Station communication
+│   ├── loon-e-control/          # Loon-E Control Code
+│   ├── loon-e-map/              # Loon-E Mapping Code
+│   ├── loon-e-motor/            # Loon-E Motor Code
+│   ├── loon-e-planning/         # Loon-E Planning Code
+│   ├── zed-ros2-examples/       # Zedx example testing code
+│   ├── zed-ros2-wrapper/        # Zedx wrapper (required for vision)
+├── wiki/                        # Additional documentation
+│   ├── setup/                   # Setup documentation
+│   └── CONTRIBUTING.md/         # Instructions on contributing to this repository
+├── LICENSE/                     # GPL-3.0 license
+└── README.md                    # Primary documentation
+```
+
+## Contributing
+
+See the [contribution guide](wiki/CONTRIBUTING) to see how you can contribute!
+
+## fast build
+colcon build --symlink-install --packages-skip zed_debug

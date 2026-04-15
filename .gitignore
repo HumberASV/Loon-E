@@ -1,0 +1,15 @@
+# Virtual environments
+venv/
+.venv/
+
+# Compiled Python Files
+__pycach__/
+__pycache__/
+# IDE files
+.vscode/
+*.swp
+
+# ros dump
+build/
+install/
+log/
