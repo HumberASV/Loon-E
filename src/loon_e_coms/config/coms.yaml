@@ -1,0 +1,25 @@
+# TCP Configuration for Communications Node
+mqtt:
+  broker:
+    host: "100.115.12.28"
+    port: 1883
+  topics:
+    destination: "loon-e/destination"
+    pwm: "loon-e/pwm"
+    path: "loon-e/path"
+    odom: "zed/odom"
+    map: "loon-e/map"
+    objects: "loon-e/objects"
+    locations: "loon-e/locations"
+    obstacles: "loon-e/obstacles"
+    rosout: "loon-e/rosout"
+  client:
+    id: "loon-e-coms-client"
+    keepalive: 60
+    qos: 1  # Quality of Service (0, 1, or 2)
+
+video:
+  enabled: true
+  udp_host: "100.115.12.28"
+  udp_port: 5005
+  jpeg_quality: 70
