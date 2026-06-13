@@ -1,15 +1,16 @@
-import socket
-import threading
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
+import numpy as np
+import socket
+import threading
 
 class Phone(Node):
     def __init__(self):
-        self.heading = None
-        self.speed = None
-        self.latitude = None
-        self.longitude = None
+        self.heading = np.nan
+        self.speed = np.nan
+        self.latitude = np.nan
+        self.longitude = np.nan
         
         super().__init__('Phone_Pub')
         self.publisher_ = self.create_publisher(Float32MultiArray, 'Phone', 10)

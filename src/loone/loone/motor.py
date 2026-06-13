@@ -16,7 +16,7 @@ class Motor(Node):
 
         #Set up PCA board
         freq = 50
-        i2c = busio.I2C(board.SCL_1, board.SDA_1)
+        i2c = busio.I2C(board.SCL, board.SDA)
         self.pca = PCA9685(i2c)
         self.pca.frequency = freq
         self.pulse = 1 / freq * 10**6
@@ -37,10 +37,10 @@ class Motor(Node):
         self.min = -45
         self.max = 45
 
-        self.current_speed = None
-        self.current_heading = None
-        self.target_heading = None
-        self.target_speed = None
+        self.current_speed = np.nan
+        self.current_heading = np.nan
+        self.target_heading = np.nan
+        self.target_speed = np.nan
 
     def remap(self, error):
         outMin = 1540
@@ -107,7 +107,7 @@ class Motor(Node):
     
     def check_data(self):
         data_good = True
-        if self.current_heading is None or self.current_speed is None or self.target_heading is None or self.target_speed is None:
+        if self.current_heading == np.nan or self.current_speed == np.nan or self.target_heading == np.nan or self.target_speed == np.nan:
             data_good = False
 
         return data_good
