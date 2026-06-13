@@ -1,24 +1,25 @@
+import os
+from glob import glob
 from setuptools import find_packages, setup
 
-package_name = 'loon_e_motor'
+package_name = 'loone'
 
 setup(
     name=package_name,
-    version='1.0.0',
+    version='0.0.0',
     packages=find_packages(exclude=['test']),
     data_files=[
         ('share/ament_index/resource_index/packages',
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
+        (os.path.join('share', package_name, 'launch'), glob('launch/*')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
-    author='Amelia Soon',
-    author_email='amelia.soon@hotmail.com',
-    maintainer='Carson Fujita',
-    maintainer_email='50027005+TheFujirose@users.noreply.github.com',    
-    description='Motor control package for Loon-E',
-    license='MIT',
+    maintainer='iamsoon',
+    maintainer_email='iamsoon@todo.todo',
+    description='TODO: Package description',
+    license='Apache-2.0',
     extras_require={
         'test': [
             'pytest',
@@ -26,7 +27,9 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'motor_control = loon_e_motor.motor_control:main',
+            'phone = loone.phone:main',
+            'task = loone.task:main',
+            'motor = loone.motor:main'
         ],
     },
 )
