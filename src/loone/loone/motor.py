@@ -28,8 +28,8 @@ class Motor(Node):
     def __init__(self):
         """Initialize the Motor node, configure PCA9685, and set up servo PWM channels."""
         super().__init__('Motor_Sub')
-        self.phone_sub = self.create_subscription(Float32MultiArray, 'Phone', self.phone_callback, 10)
-        self.task_sub = self.create_subscription(Float32MultiArray, 'Task', self.task_callback, 10)
+        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
+        self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
 
         freq = 50
         self._init_pca(freq)

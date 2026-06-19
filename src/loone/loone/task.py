@@ -5,7 +5,7 @@ from std_msgs.msg import Float32MultiArray
 class Task(Node):
     def __init__(self):
         super().__init__('Task_Pub')
-        self.publisher_ = self.create_publisher(Float32MultiArray, 'Task', 10)
+        self.publisher_ = self.create_publisher(Float32MultiArray, 'task', 10)
         timer_period = 0.25
         self.timer = self.create_timer(timer_period, self.run_task)
 

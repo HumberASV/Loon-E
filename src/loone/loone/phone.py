@@ -13,7 +13,7 @@ class Phone(Node):
         self.longitude = np.nan
         
         super().__init__('Phone_Pub')
-        self.publisher_ = self.create_publisher(Float32MultiArray, 'Phone', 10)
+        self.publisher_ = self.create_publisher(Float32MultiArray, 'phone', 10)
         self.receiver = threading.Thread(target = self.get_odometry, daemon = True)
         self.receiver.start()
 
