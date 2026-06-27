@@ -1,6 +1,5 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
 import Jetson.GPIO as GPIO
 import time
 import threading

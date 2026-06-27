@@ -123,7 +123,7 @@ class Motor(Node):
             Exception: If a servo channel cannot be acquired from the PCA9685.
         """
         prop_min, prop_max = 1120, 1880
-        rudder_min, rudder_max = 1220, 1780
+        rudder_min, rudder_max = 1220, 1820
 
         self._validate_pulse_range(prop_min, prop_max, "prop_l (ch 0)")
         self._validate_pulse_range(prop_min, prop_max, "prop_r (ch 1)")
@@ -247,7 +247,7 @@ class Motor(Node):
         elif output > self.max / 2:
             self.rudder.fraction = 1    # 35° left
         else:
-            self.rudder.fraction = 0.5  # centred
+            self.rudder.fraction = 0.55  # centred
 
         self.last_error = current_error
         self.last_time = current_time
