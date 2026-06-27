@@ -141,6 +141,20 @@ class Motor(Node):
 
         self.get_logger().info("Servo PWM channels initialized.")
 
+    def convert(self, angle):
+        """Convert a heading angle from [0, 360] to [-180, 180].
+        
+        Args:
+            angle: Heading in degrees
+        
+        Returns:
+            Converted angle
+        """
+        if angle > 180:
+            angle -= 360
+
+        return angle
+
     def remap(self, error, outMin=1540, outMax=1880):
         """Map a heading error to a proportional pulse width in microseconds.
 
@@ -222,9 +236,11 @@ class Motor(Node):
         if current_error > 0:  # turn right: reduce right propeller
             self.prop_l.fraction = self.factor
             self.prop_r.fraction = self.get_fraction(remapped_output) * self.factor
+            self.get_logger().info(f"Sending Right: {remapped_output}")
         else:  # turn left: reduce left propeller
             self.prop_l.fraction = self.get_fraction(remapped_output) * self.factor
             self.prop_r.fraction = self.factor
+            self.get_logger().info(f"Sending Left: {remapped_output}")
 
         if output < -self.max / 2:
             self.rudder.fraction = 0    # 35° right
