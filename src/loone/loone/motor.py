@@ -29,6 +29,7 @@ class Motor(Node):
         """Initialize the Motor node, configure PCA9685, and set up servo PWM channels."""
         super().__init__('Motor_Sub')
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
+        self.publisher_ = self.create_publisher(Float32MultiArray, 'motor', 10)
         self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
 
         freq = 50
@@ -222,6 +223,8 @@ class Motor(Node):
         elif output > self.max:
             output = self.max
 
+        # This remapping ensures that the output pulse width 
+        # is within the valid range for the propellers ?
         remapped_output = self.remap(output)
 
         if self.current_speed < self.target_speed:
@@ -249,6 +252,8 @@ class Motor(Node):
         else:
             self.rudder.fraction = 0.55  # centred
 
+        # Publish the current motor state as a Float32MultiArray
+        self.publisher_.publish(Float32MultiArray(data=[self.prop_l.fraction, self.prop_r.fraction, self.rudder.fraction]))
         self.last_error = current_error
         self.last_time = current_time
 
@@ -285,6 +290,14 @@ class Motor(Node):
         if self.check_data():
             self.drive()
 
+    def motor_callback(self, msg):
+        """Publish current motor state as a Float32MultiArray.
+
+        Args:
+            msg: Float32MultiArray containing motor state data.
+        """
+        self.publisher_.publish(msg)
+
     def shutdown(self):
         """De-initialize the PCA9685 and release the I2C bus on node shutdown."""
         self.pca.deinit()
@@ -293,10 +306,16 @@ class Motor(Node):
 def main(args=None):
     rclpy.init(args=args)
     motor = Motor()
-    rclpy.spin(motor)
-    motor.shutdown()
-    motor.destroy_node()
-    rclpy.shutdown()
+
+    # Add a try-except block to handle KeyboardInterrupt gracefully
+    try:
+        rclpy.spin(motor)
+    except KeyboardInterrupt:
+        motor.get_logger().info("Motor node interrupted by user.")
+    finally:
+        motor.shutdown()
+        motor.destroy_node()
+        rclpy.shutdown()
 
 
 if __name__ == '__main__':
