@@ -1,0 +1,46 @@
+# Configurations
+/task:
+  ros_parameters:
+    timer_period: 0.25 # Timer period for the task node in seconds
+
+/phone:
+  ros_parameters:
+    phone_port: 5000 # Port on the phone to route to the computer
+    computer_port: 5000 # Port on the computer to route to the phone
+    host: "127.0.0.1" # Host for the phone node (default is localhost)
+
+/path:
+  ros_parameters:
+    path_file: "path.txt" # Path to the file containing the path coordinates
+
+/led:
+  ros_parameters:
+    red_pin: 15   # GPIO board pin for red channel
+    green_pin: 32 # GPIO board pin for green channel
+    blue_pin: 33  # GPIO board pin for blue channel
+    data_pin: 40  # GPIO board pin for data input
+
+/mapping:
+  ros_parameters:
+    local_w: 20       # Local map width in meters
+    local_l: 20       # Local map length in meters
+    global_w: 50      # Global map width in meters
+    global_l: 50      # Global map length in meters
+    res: 0.5          # Map resolution in meters per cell
+    start_position: 4 # Starting quadrant/position (0.5–4, see mapping.py)
+
+/motor:
+  ros_parameters:
+    freq: 50          # PCA9685 PWM frequency in Hz
+    factor: 0.75      # Initial propeller throttle factor
+    center: 0.55      # Rudder center fraction (0 degrees)
+
+    kp: 1.0           # PID proportional gain
+    ki: 0.0           # PID integral gain
+    kd: 0.0           # PID derivative gain
+    max: 45.0         # Max heading error / PID output clamp (degrees)
+
+    prop_min: 1120    # Propeller servo min pulse width (µs)
+    prop_max: 1880    # Propeller servo max pulse width (µs)
+    rudder_min: 1220  # Rudder servo min pulse width (µs)
+    rudder_max: 1820  # Rudder servo max pulse width (µs)

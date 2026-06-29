@@ -4,17 +4,32 @@ from std_msgs.msg import Int8MultiArray
 import numpy as np
 
 class Path(Node):
+    """
+    A ROS2 node that subscribes to a global map and task path, performs path planning
+    to avoid obstacles, and publishes the resulting waypoints to a topic.
+    The node listens for incoming map and task data, generates a path that avoids obstacles,
+    and publishes a Int8MultiArray message containing the waypoints at a regular interval.
+    """
+
     def __init__(self):
+        """ Initialize the Path node and set up the publisher and subscriptions. """
         super().__init__('Path_PubSub')
         self.path_pub = self.create_publisher(Int8MultiArray, 'path', 10)
         self.map_sub = self.create_subscription(Int8MultiArray, 'global', self.map_callback(), 10)
         self.task_sub = self.create_subscription(Int8MultiArray, 'task_path', self.task_callback(), 10)
 
+
+        # Declare parameters with fallback/default values
+        self.declare_parameter('dist', 4)
+        self.declare_parameter('radius', 2)
+
+        # Retrieve parameters and initialize attributes
         self.path = [] #straight line path
         self.path_obstacles = [] #path avoiding obstacles
         self.waypoints = [] #self.path_obstacles with reduced resolution, based on self.dist
-        self.dist = 4 #interval between waypoints, in cells
-        self.radius = 2 #min distance from obstacles, in cells
+        self.dist = self.get_parameter('dist').value #interval between waypoints, in cells
+        self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
+
 
         self.map = None
         self.x_start = None
@@ -24,6 +39,7 @@ class Path(Node):
 
     #ROS - Publish
     def publish(self):
+        """ Publish the waypoints as an Int8MultiArray message. """
         msg = Int8MultiArray()
         msg.data = self.waypoints
         self.path_pub.publish(msg)
@@ -31,6 +47,7 @@ class Path(Node):
 
     #General Code
     def point_in_map(self, position):
+        """ Check if a given position is within the bounds of the map. """
         rows = len(self.map)
         cols = len(self.map[0])
         output = False
@@ -40,7 +57,14 @@ class Path(Node):
         
         return output
 
-    def find_obstacle(self, point):
+    def find_obstacle(self, point: tuple) -> bool:
+        """ 
+        Check if there is an obstacle within a certain radius of a given point. 
+        Args:
+            point (tuple): The (y, x) coordinates of the point to check.
+        Returns:
+            bool: True if there is an obstacle within the radius, False otherwise.
+        """
         output = False
         y = point[0]
         x = point[1]
@@ -54,7 +78,17 @@ class Path(Node):
         
         return output
 
-    def pathfind(self, start, expanded):
+    def pathfind(self, start: tuple, expanded: list) -> list:
+        """
+        Find the path from the start position to the end position using the expanded nodes.
+
+        Args:
+            start (tuple): The starting position (y, x).
+            expanded (list): A list of expanded nodes in the form [cost, current position, previous position].
+        
+        Returns:
+            list: A list of positions representing the path from start to end.
+        """
         parent_list = []
         
         if len(expanded)!=0: #If expanded is empty
@@ -71,9 +105,26 @@ class Path(Node):
             
         return parent_list
 
-    def check_neighbours(self, start, end, position, unexpanded, expanded, checked):
+    def check_neighbours(self, start: tuple, end: tuple, position: tuple, unexpanded: list, expanded: list, checked: list) -> None:
+        """ 
+        Check the neighboring cells of the current position and add them to the unexpanded list if they are valid. 
+
+        Args:
+            start (tuple): The starting position (y, x).
+            end (tuple): The ending position (y, x).
+            position (tuple): The current position (y, x).
+            unexpanded (list): A list of unexpanded nodes in the form [cost, current position, previous position].
+            expanded (list): A list of expanded nodes in the form [cost, current position, previous position].
+            checked (list): A list of checked positions.
+        Returns:
+            None
+        """
+         # NOTE: WHY IS THIS IN (Y, X) FORMAT? ~ Carson
         y = position[0]
         x = position[1]
+
+        # Define the directions to check (up, down, right, left, and diagonals)
+        # TODO: Amelia, can we just make this a constant ~ Carson
         dir = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)] #Up, down, right, left, diagonal
         
         for i, j in dir:
@@ -84,14 +135,32 @@ class Path(Node):
                 unexpanded.append([cost, next, position])
                 checked.append(next)
             
-    def update_waypoints(self, start, parent_list):
+    def update_waypoints(self, start: tuple, parent_list: list) -> None:
+        """
+        Update the waypoints in the path to avoid obstacles.
+
+        Args:
+            start (tuple): The starting position (y, x).
+            parent_list (list): A list of positions representing the path from start to end.
+
+        Returns:
+            None
+        """
         location = self.path_obstacles.index(start) + 1 #Find point in path list
         
         for point in parent_list:
             self.path_obstacles.insert(location, point) #Add waypoints from obstacle avoidance
         self.path_obstacles.remove(parent_list[0])
 
-    def avoid_obstacle(self, point):
+    def avoid_obstacle(self, point: tuple) -> None:
+        """
+        Avoid an obstacle by finding a new path between the previous and next waypoints.
+
+        Args:
+            point (tuple): The position (y, x) of the waypoint near the obstacle.
+        Returns:
+            None
+        """
         unexpanded=[] #Evaluated neighbours in form [cost, current position, previous position]
         expanded=[] #Visited in form [cost, current position, previous position]
         checked=[] #Checked cells in form [position]
@@ -99,7 +168,7 @@ class Path(Node):
         start = self.path[self.path.index(point) - 1]
         end_index = self.path.index(point)
         end = self.path[end_index]
-        position = (start[0], start[1])
+        position = (start[0], start[1]) #NOTE: x, y? but we are using y, x format for points ~ Carson
 
         while self.find_obstacle(end) and (end_index != len(self.path_obstacles) - 1): #move destination further away so it does not intersect with an obstacle
             self.path.remove(end)
@@ -119,7 +188,10 @@ class Path(Node):
         parent_list = self.pathfind(start, expanded)
         self.update_waypoints(start, parent_list)
         
-    def make_waypoints(self):
+    def make_waypoints(self) -> None:
+        """
+        Create waypoints along the path, avoiding obstacles.
+        """
         self.path_obstacles = self.path
 
         for point in self.path:
@@ -127,12 +199,15 @@ class Path(Node):
                 self.avoid_obstacle(point)
                 
         for point in self.path_obstacles:
-            y = point[0]
+            y = point[0] # NOTE: wouldn't it be better to use y = point[1] and x = point[0] since the point is in (y, x) format? ~ Carson
             x = point[1]
             if ((self.path_obstacles.index(point) % self.dist == 0) or (point == self.path_obstacles[-1])): #Add every d points to waypoint list and last waypoint
                 self.waypoints.append(point)
 
-    def get_path(self):
+    def get_path(self) -> None:
+        """
+        Generate the path from start to end, avoiding obstacles.
+        """
         while self.find_obstacle((self.y_end, self.x_end)): #Ensure that end point is not near obstacle
             self.y_end = self.y_end - 1 #UPDATE
         
@@ -162,12 +237,14 @@ class Path(Node):
         self.publish()
     
     #ROS - Subscribe
-    def map_callback(self, msg):
+    def map_callback(self, msg) -> None:
+        """ Callback function for the map subscription. Updates the internal map representation. """
         data = msg.data
         self.get_logger().info(f"Map: {msg.data}")
         self.map = data
 
-    def task_callback(self, msg):
+    def task_callback(self, msg: Int8MultiArray) -> None:
+        """ Callback function for the task subscription. Updates the start and end positions. """
         data = msg.data
         self.get_logger().info(f"Task: {msg.data}")
         self.y_start = data[0]
@@ -178,6 +255,8 @@ class Path(Node):
             self.get_path()
     
 def main(args = None):
+    """ Main function to initialize the ROS2 node and start spinning. """
+
     rclpy.init(args = args)
     planning = Path()
     try:

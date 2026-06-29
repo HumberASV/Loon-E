@@ -7,10 +7,16 @@ import subprocess
 import threading
 
 class Phone(Node):
-
-    # Class Constants
-    HOST = "127.0.0.1" # Local Host
-    PORT = 5000 # Port: used for rerouting phone to computer
+    """
+    A ROS2 node that retrieves GPS coordinates, speed, and heading from a phone using 
+    ADB (Android Debug Bridge) and publishes this data to a topic.
+    The node listens for incoming data from the phone and publishes a Float32MultiArray message containing
+        the latitude, 
+        longitude, 
+        speed, 
+        and heading
+    at a regular interval.
+    """
 
     def __init__(self):
         """
@@ -22,19 +28,29 @@ class Phone(Node):
         self.latitude = np.nan
         self.longitude = np.nan
 
+        # Declare parameters with fallback/default values
+        self.declare_parameter('phone_port', 5000)
+        self.declare_parameter('computer_port', 5000)
+        self.declare_parameter('host', "127.0.0.1")
+
+        # Retrieve parameters
+        self.PHONE_PORT = self.get_parameter('phone_port').value
+        self.PORT = self.get_parameter('computer_port').value
+        self.HOST = self.get_parameter('host').value
+
         self.get_adb_devices()
         self.route_adb()
-
-        super().__init__('Phone_Pub')
+        
+        super().__init__('Phone_Pub') # Why is this here? ~ Carson
         self.phone_pub = self.create_publisher(Float32MultiArray, 'phone', 10)
         self.receiver = threading.Thread(target = self.get_odometry, daemon = True)
         self.receiver.start()
+        self.get_logger().info(f"Phone node initialized. Listening on {self.HOST}:{self.PORT} and routing to phone port {self.PHONE_PORT}.")
 
     def publish(self):
         msg = Float32MultiArray()
         msg.data = [self.latitude, self.longitude, self.speed, self.heading]
         self.phone_pub.publish(msg)
-        #self.get_logger().info(f"Phone: {msg.data}")
     
     def get_odometry(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -93,8 +109,8 @@ class Phone(Node):
         subprocess.run(["adb","reverse","--remove-all"])
 
         # Route the localhost to computer local host
-        subprocess.run(["adb", "reverse", f"tcp:{self.PORT}", f"tcp:{self.PORT}"])
-        self.get_logger().info(f"Routed phone localhost:{self.PORT} to computer localhost:{self.PORT}")
+        subprocess.run(["adb", "reverse", f"tcp:{self.PHONE_PORT}", f"tcp:{self.PORT}"])
+        self.get_logger().info(f"Routed phone localhost:{self.PHONE_PORT} to computer localhost:{self.PORT}")
 
 def main(args = None):
     rclpy.init(args = args)
