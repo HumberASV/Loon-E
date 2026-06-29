@@ -6,6 +6,7 @@ Here are some important resources:
 
 * Bugs? [Github Issues](https://github.com/HumberASV/Loon-E/issues) is where to report them.
 * Environment? see the [setup](setup/ENV.md) documentation.
+* Configuration? see the [config](setup/CONFIG.md) documentation.
 * License? [MIT](../LICENSE).
 
 ## AI Use

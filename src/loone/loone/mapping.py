@@ -5,21 +5,34 @@ import numpy as np
 import math
 
 class Mapping(Node):
-    def __init__(self):
-        global_size = [50, 50]
-        start_position = [4]
+    """ A ROS2 node that manages the mapping of the environment based on data from various sources.
+    The node subscribes to topics providing information about detected objects and the phone's position,
+    and publishes the global map and the current position of the robot.
+    """
 
+    def __init__(self):
+        """ Initialize the Mapping node and set up publishers and subscribers. """
         super().__init__('Map_PubSub')
         self.global_pub = self.create_publisher(Int8MultiArray, 'global', 10)
         self.position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
-        self.objects_sub = self.create_subscription(Float32MultiArray, 'objects', self.object_callback(), 10)
-        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback(), 10)
+        self.objects_sub = self.create_subscription(Float32MultiArray, 'objects', self.object_callback, 10)
+        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
 
-        self.local_w = 20
-        self.local_l = 20
-        self.global_w = global_size[0]
-        self.global_l = global_size[1]
-        self.res = 0.5
+        # Declare parameters with fallback/default values
+        self.declare_parameter('local_w', 20)
+        self.declare_parameter('local_l', 20)
+        self.declare_parameter('global_w', 50)
+        self.declare_parameter('global_l', 50)
+        self.declare_parameter('res', 0.5)
+        self.declare_parameter('start_position', 4)
+
+        # Retrieve parameters
+        self.local_w = self.get_parameter('local_w').value
+        self.local_l = self.get_parameter('local_l').value
+        self.global_w = self.get_parameter('global_w').value
+        self.global_l = self.get_parameter('global_l').value
+        self.res      = self.get_parameter('res').value
+        start_position = self.get_parameter('start_position').value
 
         self.local_rows = self.get_cell(self.local_w)
         self.local_cols = self.get_cell(self.local_l)
@@ -55,31 +68,49 @@ class Mapping(Node):
         self.publish_mapdata()
 
     #ROS - Publish
-    def publish(self):
+    def publish(self) -> None:
+        """ Publish the global map as an Int8MultiArray message. """
         msg = Int8MultiArray()
         msg.data = self.global_map
         self.global_pub.publish(msg)
         self.get_logger().info(f"Map: {msg.data}")
 
-    def publish_position(self):
+    def publish_position(self) -> None:
+        """ Publish the current position as a Float32MultiArray message. """
         msg = Float32MultiArray()
         msg.data = self.global_position
         self.position_pub.publish(msg)
-        self.logger().info(f"Position: {msg.data}")
+        self.get_logger().info(f"Position: {msg.data}")
     
-    def publish_mapdata(self):
+    def publish_mapdata(self) -> None:
+        """ Publish the local map dimensions and resolution as a Float32MultiArray message. """
         msg = Float32MultiArray()
         msg.data = [self.local_w, self.res]
         self.position_pub.publish(msg)
         self.get_logger().info(f"Map Data: {msg.data}")
 
     #General Code
-    def get_cell(self, meter): #convert units in meters to units in cells
+    def get_cell(self, meter: float) -> int: #convert units in meters to units in cells
+        """
+        Convert a distance in meters to the corresponding number of grid cells based on the map resolution.
+
+        Args:
+            meter (float): The distance in meters to be converted.
+        returns:
+            int: The equivalent number of grid cells, rounded to the nearest whole number.
+        """
         cell = round(meter / self.res)
 
         return cell
     
-    def get_map_cell(self, start, end): #Get heading from two coordinates
+    def get_map_cell(self, start: list, end: list) -> None: #Get heading from two coordinates
+        """
+        Calculate the change in global position based on two coordinates, converting the distance to grid cells.
+
+        Args:
+            start (list): The starting coordinate as a list [x, y].
+            end (list): The ending coordinate as a list [x, y].
+        """
         #Possible edit: Use haversine formula instead
         lat = math.radians((start[1] + end[1]) / 2)
         y = self.get_cell((start[0] - end[0]) * 111000)
@@ -87,7 +118,8 @@ class Mapping(Node):
         self.global_position[0] += y
         self.global_position[1] += x
     
-    def get_global_map(self):
+    def get_global_map(self) -> None:
+        """ Update the global map based on the local map and the current position and heading. """
         self.get_map_cell(self.position_0, self.position)
         mid = round((self.global_cols - 1) / 2)
         for i in range(self.global_rows):
@@ -109,7 +141,8 @@ class Mapping(Node):
         
         self.publish()
 
-    def get_local_map(self):
+    def get_local_map(self) -> None:
+        """ Update the local map based on detected obstacles and their locations. """
         self.local_map = np.zeros((self.local_rows, self.local_cols))
 
         for i in range(len(self.obstacles)):
@@ -137,14 +170,26 @@ class Mapping(Node):
             self.get_global_map()
     
     #ROS - Subscribe
-    def object_callback(self, msg):
+    def object_callback(self, msg: CustomMsg) -> None:
+        """ 
+        Callback function for the objects subscription. Updates the detected objects and their locations. 
+        
+        Args:
+            msg (CustomMsg): The message received from the objects topic, containing detected objects and their
+        """
         data = msg.data
         self.get_logger().info(f"Objects: {msg.data}")
         self.objects = data[0]
         self.locations = data[1]
         self.get_local_map()
 
-    def phone_callback(self, msg):
+    def phone_callback(self, msg: CustomMsg) -> None:
+        """ 
+        Callback function for the phone subscription. Updates the current position and heading based on phone data. 
+        
+        Args:
+            msg (CustomMsg): The message received from the phone topic, containing position and heading data
+        """
         data = msg.data
         self.get_logger().info(f"Phone: {msg.data}")
         if data[0] != self.position_0[0] or data[1] != self.position_0[1]:
@@ -153,6 +198,7 @@ class Mapping(Node):
         self.heading = data[3]
     
 def main(args = None):
+    """ Main function to initialize the ROS2 node and start spinning. """
     rclpy.init(args = args)
     mapping = Mapping()
     try:

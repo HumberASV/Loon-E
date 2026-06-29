@@ -32,20 +32,38 @@ class Motor(Node):
         self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
         self.motor_pub = self.create_publisher(Float32MultiArray, 'motor', 10)
 
-        freq = 50
+        # Declare parameters with fallback/default values
+        self.declare_parameter('freq', 50)
+        self.declare_parameter('factor', 0.75)
+        self.declare_parameter('center', 0.55)
+        self.declare_parameter('kp', 1.0)
+        self.declare_parameter('ki', 0.0)
+        self.declare_parameter('kd', 0.0)
+        self.declare_parameter('max', 45.0)
+        self.declare_parameter('prop_min', 1120)
+        self.declare_parameter('prop_max', 1880)
+        self.declare_parameter('rudder_min', 1220)
+        self.declare_parameter('rudder_max', 1820)
+
+        # Retrieve parameters
+        freq       = self.get_parameter('freq').value
+        self.factor = self.get_parameter('factor').value
+        self.center = self.get_parameter('center').value
+        self.kp    = self.get_parameter('kp').value
+        self.ki    = self.get_parameter('ki').value
+        self.kd    = self.get_parameter('kd').value
+        self.max   = self.get_parameter('max').value
+        prop_min   = self.get_parameter('prop_min').value
+        prop_max   = self.get_parameter('prop_max').value
+        rudder_min = self.get_parameter('rudder_min').value
+        rudder_max = self.get_parameter('rudder_max').value
+
         self._init_pca(freq)
-        self._init_servos()
+        self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
 
-        self.factor = 0.75
-        self.center = 0.55
-
-        self.kp = 1
-        self.ki = 0
-        self.kd = 0
         self.i = 0
         self.last_error = 0
         self.last_time = time.time()
-        self.max = 45
 
         self.current_speed = np.nan
         self.current_heading = np.nan
@@ -124,16 +142,13 @@ class Motor(Node):
         self.motor_pub.publish(msg)
         #self.get_logger().info(f"Motor: {msg.data}")
         
-    def _init_servos(self):
+    def _init_servos(self, prop_min, prop_max, rudder_min, rudder_max):
         """Set up servo PWM channels on the PCA9685 with validated pulse ranges.
 
         Raises:
             ValueError: If any pulse range is invalid (see _validate_pulse_range).
             Exception: If a servo channel cannot be acquired from the PCA9685.
         """
-        prop_min, prop_max = 1120, 1880
-        rudder_min, rudder_max = 1220, 1820
-
         self._validate_pulse_range(prop_min, prop_max, "prop_l (ch 0)")
         self._validate_pulse_range(prop_min, prop_max, "prop_r (ch 1)")
         self._validate_pulse_range(rudder_min, rudder_max, "rudder (ch 2)")
