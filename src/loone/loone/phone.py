@@ -26,14 +26,14 @@ class Phone(Node):
         self.route_adb()
 
         super().__init__('Phone_Pub')
-        self.publisher_ = self.create_publisher(Float32MultiArray, 'phone', 10)
+        self.phone_pub = self.create_publisher(Float32MultiArray, 'phone', 10)
         self.receiver = threading.Thread(target = self.get_odometry, daemon = True)
         self.receiver.start()
 
     def publish(self):
         msg = Float32MultiArray()
         msg.data = [self.latitude, self.longitude, self.speed, self.heading]
-        self.publisher_.publish(msg)
+        self.phone_pub.publish(msg)
         #self.get_logger().info(f"Phone: {msg.data}")
     
     def get_odometry(self):
