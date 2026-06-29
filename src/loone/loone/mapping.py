@@ -108,13 +108,18 @@ class Mapping(Node):
         Calculate the change in global position based on two coordinates, converting the distance to grid cells.
 
         Args:
-            start (list): The starting coordinate as a list [x, y].
-            end (list): The ending coordinate as a list [x, y].
+            start (list): The starting coordinate as a list [y, x].
+            end (list): The ending coordinate as a list [y, x].
         """
         #Possible edit: Use haversine formula instead
         lat = math.radians((start[1] + end[1]) / 2)
+        # NOTE: Why is lat calculated as the average of start[1] and end[1]? 
+        # It seems like it should be the average of the latitudes (start[0] and end[0]) instead. 
+        # This might be a bug. ~ Carson
         y = self.get_cell((start[0] - end[0]) * 111000)
         x = self.get_cell((start[1] - end[1]) * 111000 * math.cos(lat))
+        # NOTE: Why is the y-coordinate calculated using start[0] and end[0], while the x-coordinate uses start[1] and end[1]?
+        # This seems inconsistent with x,y coordinates as this is y,x. It might be a bug. ~ Carson
         self.global_position[0] += y
         self.global_position[1] += x
     
@@ -158,8 +163,10 @@ class Mapping(Node):
             objL = self.get_cell(obj_length)
             objW = self.get_cell(obj_width)
 
+            # X and Y coordinates of the object in the local map
+            # NOTE: inconsistency in the order of coordinates (X, Y) vs (Y, X) might lead to confusion. ~ Carson
             objStartX = self.get_cell(location[0])
-            objStartY = self.get_cell(location[1])
+            objStartY = self.get_cell(location[1]) 
 
             # Write into the matrix
             for i in range(objL):

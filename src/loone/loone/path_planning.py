@@ -119,11 +119,12 @@ class Path(Node):
         Returns:
             None
         """
+         # NOTE: WHY IS THIS IN (Y, X) FORMAT? ~ Carson
         y = position[0]
         x = position[1]
 
         # Define the directions to check (up, down, right, left, and diagonals)
-        # Amelia, can we just make this a constant ~ Carson
+        # TODO: Amelia, can we just make this a constant ~ Carson
         dir = [(1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (-1, -1), (1, -1)] #Up, down, right, left, diagonal
         
         for i, j in dir:
@@ -167,7 +168,7 @@ class Path(Node):
         start = self.path[self.path.index(point) - 1]
         end_index = self.path.index(point)
         end = self.path[end_index]
-        position = (start[0], start[1]) # x, y?
+        position = (start[0], start[1]) #NOTE: x, y? but we are using y, x format for points ~ Carson
 
         while self.find_obstacle(end) and (end_index != len(self.path_obstacles) - 1): #move destination further away so it does not intersect with an obstacle
             self.path.remove(end)
@@ -198,7 +199,7 @@ class Path(Node):
                 self.avoid_obstacle(point)
                 
         for point in self.path_obstacles:
-            y = point[0] # wouldn't it be better to use y = point[1] and x = point[0] since the point is in (y, x) format? ~ Carson
+            y = point[0] # NOTE: wouldn't it be better to use y = point[1] and x = point[0] since the point is in (y, x) format? ~ Carson
             x = point[1]
             if ((self.path_obstacles.index(point) % self.dist == 0) or (point == self.path_obstacles[-1])): #Add every d points to waypoint list and last waypoint
                 self.waypoints.append(point)
@@ -255,7 +256,7 @@ class Path(Node):
     
 def main(args = None):
     """ Main function to initialize the ROS2 node and start spinning. """
-    
+
     rclpy.init(args = args)
     planning = Path()
     try:
