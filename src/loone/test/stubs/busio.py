@@ -9,3 +9,12 @@
 class I2C:
     def __init__(self, *args, **kwargs):
         pass
+
+
+# adafruit_pca9685 transitively imports adafruit_bus_device.spi_device,
+# whose module-level `from busio import SPI` must succeed (its except
+# clause only resets DigitalInOut, never defines SPI), since SPIDevice's
+# __init__ uses a bare (eagerly-evaluated) `spi: SPI` annotation.
+class SPI:
+    def __init__(self, *args, **kwargs):
+        pass
