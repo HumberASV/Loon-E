@@ -27,4 +27,4 @@ jobs:
         run: |
           source /opt/ros/humble/setup.bash
           export PYTHONPATH="$PYTHONPATH:$GITHUB_WORKSPACE/src/loone:$GITHUB_WORKSPACE/src/loone/test/stubs"
-          pytest src/loone/test/test_motor.py -v
+          python3 -m pytest src/loone/test/test_motor.py -v
