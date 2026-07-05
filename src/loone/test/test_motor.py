@@ -72,7 +72,14 @@ def motor_node():
     busio_patcher.start()
     board_patcher.start()
     pca_mock = pca_patcher.start()
-    servo_patcher.start()
+    servo_mock = servo_patcher.start()
+
+    # Servo(channel, min_pulse=..., max_pulse=...) is called once per channel
+    # (prop_l, prop_r, rudder). A bare MagicMock call returns the same
+    # `return_value` no matter the arguments, so without this side_effect all
+    # three servo attributes would alias one fake object and `.fraction`
+    # writes to one would silently clobber the others.
+    servo_mock.Servo.side_effect = lambda *args, **kwargs: MagicMock()
 
     # PCA9685(i2c) is called with the i2c bus as argument and must return an
     # object with a .channels list.  We build a fake PCA9685 instance here.
@@ -88,7 +95,7 @@ def motor_node():
     node = Motor()
 
     # Patch the publisher so we can check what gets published in drive() tests.
-    node.publisher_ = MagicMock()
+    node.motor_pub = MagicMock()
 
     # Patch get_logger() so log calls inside methods don't crash.
     node.get_logger = MagicMock(return_value=MagicMock())
@@ -231,42 +238,83 @@ class TestGetFraction:
 # ── State check tests ──────────────────────────────────────────────────────────
 
 class TestCheckData:
-    """check_data() returns True only when all four values are ready."""
+    """check_data() dispatches to a motion function based on self.command."""
 
-    def test_returns_false_when_heading_is_nan(self, motor_node):
+    def test_command_reverse_calls_reverse(self, motor_node):
+        motor_node.command = -1
+        motor_node.reverse = MagicMock()
+        motor_node.check_data()
+        motor_node.reverse.assert_called_once()
+
+    def test_command_stop_calls_stop(self, motor_node):
+        motor_node.command = 0
+        motor_node.stop = MagicMock()
+        motor_node.check_data()
+        motor_node.stop.assert_called_once()
+
+    def test_command_drive_does_not_drive_when_heading_is_nan(self, motor_node):
+        motor_node.command = 1
         motor_node.current_heading = np.nan
         motor_node.current_speed = 1.0
         motor_node.target_heading = 90.0
         motor_node.target_speed = 1.0
-        assert motor_node.check_data() is False
+        motor_node.drive = MagicMock()
+        motor_node.check_data()
+        motor_node.drive.assert_not_called()
 
-    def test_returns_false_when_speed_is_nan(self, motor_node):
+    def test_command_drive_does_not_drive_when_speed_is_nan(self, motor_node):
+        motor_node.command = 1
         motor_node.current_heading = 90.0
         motor_node.current_speed = np.nan
         motor_node.target_heading = 90.0
         motor_node.target_speed = 1.0
-        assert motor_node.check_data() is False
+        motor_node.drive = MagicMock()
+        motor_node.check_data()
+        motor_node.drive.assert_not_called()
 
-    def test_returns_false_when_target_heading_is_none(self, motor_node):
+    def test_command_drive_does_not_drive_when_target_heading_is_none(self, motor_node):
+        motor_node.command = 1
         motor_node.current_heading = 90.0
         motor_node.current_speed = 1.0
         motor_node.target_heading = None
         motor_node.target_speed = 1.0
-        assert motor_node.check_data() is False
+        motor_node.drive = MagicMock()
+        motor_node.check_data()
+        motor_node.drive.assert_not_called()
 
-    def test_returns_false_when_target_speed_is_none(self, motor_node):
+    def test_command_drive_does_not_drive_when_target_speed_is_none(self, motor_node):
+        motor_node.command = 1
         motor_node.current_heading = 90.0
         motor_node.current_speed = 1.0
         motor_node.target_heading = 90.0
         motor_node.target_speed = None
-        assert motor_node.check_data() is False
+        motor_node.drive = MagicMock()
+        motor_node.check_data()
+        motor_node.drive.assert_not_called()
 
-    def test_returns_true_when_all_data_present(self, motor_node):
+    def test_command_drive_calls_drive_when_all_data_present(self, motor_node):
+        motor_node.command = 1
         motor_node.current_heading = 90.0
         motor_node.current_speed = 1.0
         motor_node.target_heading = 90.0
         motor_node.target_speed = 1.0
-        assert motor_node.check_data() is True
+        motor_node.drive = MagicMock()
+        motor_node.check_data()
+        motor_node.drive.assert_called_once()
+
+    def test_command_turn_calls_turn_in_place_when_dir_set(self, motor_node):
+        motor_node.command = 2
+        motor_node.dir = 1
+        motor_node.turn_in_place = MagicMock()
+        motor_node.check_data()
+        motor_node.turn_in_place.assert_called_once()
+
+    def test_command_turn_does_not_turn_when_dir_is_none(self, motor_node):
+        motor_node.command = 2
+        motor_node.dir = None
+        motor_node.turn_in_place = MagicMock()
+        motor_node.check_data()
+        motor_node.turn_in_place.assert_not_called()
 
 
 # ── Callback tests ─────────────────────────────────────────────────────────────
@@ -284,8 +332,9 @@ class TestCallbacks:
         assert motor_node.current_heading == 135.0
 
     def test_task_callback_stores_heading_and_speed(self, motor_node):
+        # [command, target_heading, target_speed, dir] — matches Task's publisher
         msg = MagicMock()
-        msg.data = [0.0, 45.0, 1.5]  # index 1 = target heading, 2 = target speed
+        msg.data = [1.0, 45.0, 1.5, 0.0]
 
         # Keep sensor data invalid so drive() is NOT triggered yet
         motor_node.current_heading = np.nan
@@ -297,7 +346,7 @@ class TestCallbacks:
 
     def test_task_callback_does_not_drive_when_data_invalid(self, motor_node):
         msg = MagicMock()
-        msg.data = [0.0, 45.0, 1.5]
+        msg.data = [1.0, 45.0, 1.5, 0.0]
         motor_node.current_heading = np.nan  # data still invalid
 
         # Swap drive() for a MagicMock so we can check it was NOT called
@@ -311,7 +360,7 @@ class TestCallbacks:
         motor_node.current_speed = 1.0
 
         msg = MagicMock()
-        msg.data = [0.0, 45.0, 1.5]
+        msg.data = [1.0, 45.0, 1.5, 0.0]  # command=1 (drive)
 
         motor_node.drive = MagicMock()
         motor_node.task_callback(msg)
@@ -336,8 +385,8 @@ class TestDrive:
 
     def test_drive_publishes_motor_state(self, motor_node):
         self._setup(motor_node, current_heading=0.0, target_heading=10.0)
-        # publisher_.publish must be called exactly once per drive() cycle
-        motor_node.publisher_.publish.assert_called_once()
+        # motor_pub.publish must be called exactly once per drive() cycle
+        motor_node.motor_pub.publish.assert_called_once()
 
     def test_positive_error_reduces_right_propeller(self, motor_node):
         # current_error = 10 - 0 = +10  →  turn right: prop_r fraction < factor

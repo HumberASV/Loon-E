@@ -269,9 +269,9 @@ class Motor(Node):
             self.get_logger().info(f"Sending Left: {remapped_output}")
 
         if output < -self.max / 2:
-            self.rudder.fraction = 0    # 35° right
+            self.rudder.fraction = 0.0    # 35° right
         elif output > self.max / 2:
-            self.rudder.fraction = 1    # 35° left
+            self.rudder.fraction = 1.0    # 35° left
         else:
             self.rudder.fraction = self.center  # centred
             
@@ -313,8 +313,8 @@ class Motor(Node):
                 self.stop()
 
             case 1: #drive
-                if (self.current_heading is not None
-                    and self.current_speed is not None
+                if (not np.isnan(self.current_heading)
+                    and not np.isnan(self.current_speed)
                     and self.target_heading is not None
                     and self.target_speed is not None):
                     
@@ -344,8 +344,8 @@ class Motor(Node):
         data = msg.data
         self.get_logger().info(f"Task: {msg.data}")
         self.command = data[0]
-        self.target_speed = data[1]
-        self.target_heading = data[2]
+        self.target_heading = data[1]
+        self.target_speed = data[2]
         self.dir = data[3]
         self.check_data()
 
