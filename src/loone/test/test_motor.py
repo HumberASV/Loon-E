@@ -68,15 +68,11 @@ def motor_node():
     # Replace the servo module so Servo() objects are fakes we can inspect.
     servo_patcher = patch('loone.motor.servo')
 
-    rclpy_mock = rclpy_patcher.start()
+    rclpy_patcher.start()
     busio_patcher.start()
     board_patcher.start()
     pca_mock = pca_patcher.start()
     servo_patcher.start()
-
-    # Motor.__init__ calls super().__init__('Motor_Sub') which is rclpy.Node.__init__.
-    # We make that a no-op lambda so Python's MRO doesn't crash.
-    rclpy_mock.node.Node.__init__ = lambda self, name: None
 
     # PCA9685(i2c) is called with the i2c bus as argument and must return an
     # object with a .channels list.  We build a fake PCA9685 instance here.
@@ -85,8 +81,8 @@ def motor_node():
     pca_mock.return_value = pca_instance  # PCA9685(...) now returns pca_instance
 
     # Motor also calls self.create_subscription / create_publisher / get_logger,
-    # which are Node methods.  Because Node.__init__ is patched out, these
-    # attributes don't exist yet — so we set them as MagicMocks directly.
+    # which are real Node methods (conftest.py's session-scoped rclpy.init()
+    # keeps the default context valid, so Node.__init__ runs for real here).
     from loone.motor import Motor
 
     node = Motor()
@@ -115,13 +111,11 @@ class TestInitValidation:
     def test_invalid_pca_freq_too_low_raises(self):
         # We need a fresh Motor for this, but we want _init_pca to raise before
         # completing.  We still need all the hardware patches active.
-        with patch('loone.motor.rclpy') as rclpy_mock, \
+        with patch('loone.motor.rclpy'), \
              patch('loone.motor.busio'), \
              patch('loone.motor.board'), \
              patch('loone.motor.PCA9685'), \
              patch('loone.motor.servo'):
-
-            rclpy_mock.node.Node.__init__ = lambda self, name: None
 
             from loone.motor import Motor
             node = Motor.__new__(Motor)  # allocate without calling __init__
@@ -132,13 +126,11 @@ class TestInitValidation:
                 node._init_pca(10)
 
     def test_invalid_pca_freq_too_high_raises(self):
-        with patch('loone.motor.rclpy') as rclpy_mock, \
+        with patch('loone.motor.rclpy'), \
              patch('loone.motor.busio'), \
              patch('loone.motor.board'), \
              patch('loone.motor.PCA9685'), \
              patch('loone.motor.servo'):
-
-            rclpy_mock.node.Node.__init__ = lambda self, name: None
 
             from loone.motor import Motor
             node = Motor.__new__(Motor)
