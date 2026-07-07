@@ -12,6 +12,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Remove problematic Microsoft repositories
+        run: |
+          sudo rm -f /etc/apt/sources.list.d/microsoft*.list
+          sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys EB3D30B63BE870EE || true
+          sudo apt-get update --allow-unauthenticated || sudo apt-get update || true
+
       - name: Set up ROS 2 Humble
         uses: ros-tooling/setup-ros@v0.7
         with:
