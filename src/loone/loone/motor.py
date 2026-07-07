@@ -7,7 +7,7 @@ import busio
 import board
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
-
+import threading
 
 class Motor(Node):
     """ROS2 node that controls motor outputs via a PCA9685 PWM driver.
@@ -28,6 +28,13 @@ class Motor(Node):
     def __init__(self) -> None:
         """Initialize the Motor node, configure PCA9685, and set up servo PWM channels."""
         super().__init__('Motor_PubSub')
+
+        # we need value from phone and task to drive the motors
+        # check if we have received data from both before executing
+        self.phone_data_ready_event = threading.Event()
+        self.task_data_ready_event = threading.Event()
+
+        # subscribe to phone and task topics, publish to motor topic
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
         self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
         self.motor_pub = self.create_publisher(Float32MultiArray, 'motor', 10)
@@ -69,6 +76,12 @@ class Motor(Node):
         self.current_heading = np.nan
         self.target_heading = None
         self.target_speed = None
+
+        # Spin until data is received
+        self.get_logger().info('waiting for phone and task data...')
+        while not self.phone_data_ready_event.is_set() or not self.task_data_ready_event.is_set():
+            rclpy.spin_once(self, timeout_sec=0.1)
+        self.get_logger().info('phone and task data received, starting motor control loop.')
 
     def _init_pca(self, freq) -> None:
         """Initialize the PCA9685 PWM driver over I2C.
@@ -230,6 +243,13 @@ class Motor(Node):
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()
+        
+        #defensive check to ensure we have valid target and current heading/speed values
+        if (np.isnan(self.current_heading) or np.isnan(self.current_speed)
+                or self.target_heading is None or self.target_speed is None):
+            self.get_logger().warning("Sensor/target data not ready; skipping drive cycle.")
+            return
+        
         current_error = self.target_heading - self.current_heading
         dt = current_time - self.last_time
         de = (current_error - self.last_error) / dt
@@ -313,18 +333,13 @@ class Motor(Node):
                 self.stop()
 
             case 1: #drive
-                if not (np.isnan(self.current_heading)
-                    or np.isnan(self.current_speed)
-                    or np.isnan(self.target_heading)
-                    or np.isnan(self.target_speed)):
-                    
-                    self.drive()
+                self.drive()
             
             case 2: #turn
                 if (self.dir is not None):
                     self.turn_in_place()
 
-    def phone_callback(self, msg) -> None:
+    def phone_callback(self, msg) -> None:  
         """Handle incoming phone telemetry and update current speed and heading.
 
         Args:
@@ -334,6 +349,7 @@ class Motor(Node):
         self.get_logger().info(f"Phone: {msg.data}")
         self.current_speed = data[2]
         self.current_heading = data[3]
+        self.phone_data_ready_event.set() # Unblocks the init sequence
 
     def task_callback(self, msg) -> None:
         """Handle incoming task commands and drive motors if sensor data is ready.
@@ -348,6 +364,7 @@ class Motor(Node):
         self.target_speed = data[2]
         self.dir = data[3]
         self.check_data()
+        self.task_data_ready_event.set() # Unblocks the init sequence
 
     def shutdown(self) -> None:
         """De-initialize the PCA9685 and release the I2C bus on node shutdown."""
@@ -361,6 +378,8 @@ def main(args=None) -> None:
         rclpy.spin(motor)
     except KeyboardInterrupt:
         motor.get_logger().info("Motor node interrupted by user.")
+    except Exception as e:
+        motor.get_logger().error(f"Motor node encountered an error: {e}")
     finally:
         motor.shutdown()
         motor.destroy_node()
