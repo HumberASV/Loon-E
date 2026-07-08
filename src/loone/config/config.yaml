@@ -1,6 +1,9 @@
 # Configurations
 /task:
   ros_parameters:
+    task: [0] # List of tasks to be performed
+    latitude: [] # List of GPS latitudes
+    longitude: [] # List of GPS longitudes
     timer_period: 0.25 # Timer period for the task node in seconds
 
 /phone:
@@ -18,7 +21,7 @@
     red_pin: 15   # GPIO board pin for red channel
     green_pin: 32 # GPIO board pin for green channel
     blue_pin: 33  # GPIO board pin for blue channel
-    data_pin: 40  # GPIO board pin for data input
+    data_pin: 7   # GPIO board pin for data input
 
 /mapping:
   ros_parameters:
