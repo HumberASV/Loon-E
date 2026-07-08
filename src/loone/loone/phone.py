@@ -113,6 +113,7 @@ class Phone(Node):
         self.get_logger().info(f"Routed phone localhost:{self.PHONE_PORT} to computer localhost:{self.PORT}")
 
 def main(args = None):
+    """ Main function to initialize the ROS2 node and start spinning. """
     rclpy.init(args = args)
     phone = Phone()
     try:

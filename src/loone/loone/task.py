@@ -45,11 +45,8 @@ class Task(Node):
 
 def main(args = None) -> None:
     """ Main function to initialize the ROS2 node and start spinning. """
-
     rclpy.init(args = args)
     task = Task()
-
-    # Add a try-except block to handle KeyboardInterrupt gracefully
     try:
         rclpy.spin(task)
     except KeyboardInterrupt:

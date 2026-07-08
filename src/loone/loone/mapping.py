@@ -42,6 +42,8 @@ class Mapping(Node):
         self.global_map = np.zeros((self.global_rows, self.global_cols))
 
         match start_position:
+            case 0: # Origin
+                self.global_position = [round(self.global_rows)*0.5, round(self.global_cols*0.5)]
             case 0.5: # Positive Y axis
                 self.global_position = [round(self.global_rows*0.25), round(self.global_cols*0.5)]
             case 1: # Quadrant 1
@@ -65,8 +67,6 @@ class Mapping(Node):
         self.position_0 = [None, None]
         self.heading = None
 
-        self.publish_mapdata()
-
     #ROS - Publish
     def publish(self) -> None:
         """ Publish the global map as an Int8MultiArray message. """
@@ -82,13 +82,6 @@ class Mapping(Node):
         self.position_pub.publish(msg)
         self.get_logger().info(f"Position: {msg.data}")
     
-    def publish_mapdata(self) -> None:
-        """ Publish the local map dimensions and resolution as a Float32MultiArray message. """
-        msg = Float32MultiArray()
-        msg.data = [self.local_w, self.res]
-        self.position_pub.publish(msg)
-        self.get_logger().info(f"Map Data: {msg.data}")
-
     #General Code
     def get_cell(self, meter: float) -> int: #convert units in meters to units in cells
         """

@@ -256,7 +256,6 @@ class Path(Node):
     
 def main(args = None):
     """ Main function to initialize the ROS2 node and start spinning. """
-
     rclpy.init(args = args)
     planning = Path()
     try:
