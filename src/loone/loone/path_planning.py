@@ -15,6 +15,8 @@ class Path(Node):
     def __init__(self):
         """ Initialize the Path node and set up the publisher and subscriptions. """
         super().__init__('Path_PubSub')
+
+        #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'path', 10)
         self.map_sub = self.create_subscription(Int8MultiArray, 'global', self.map_callback(), 10)
         self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback(), 10)
@@ -30,7 +32,7 @@ class Path(Node):
         self.dist = self.get_parameter('dist').value #interval between waypoints, in cells
         self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
 
-
+        #Other variables from topics
         self.map = []
         self.x_start = np.nan
         self.y_start = np.nan

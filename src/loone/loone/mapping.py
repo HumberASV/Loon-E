@@ -14,6 +14,8 @@ class Mapping(Node):
     def __init__(self):
         """ Initialize the Mapping node and set up publishers and subscribers. """
         super().__init__('Map_PubSub')
+
+        #Publishers and Subscribers
         self.global_pub = self.create_publisher(Int8MultiArray, 'global', 10)
         self.current_position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
         self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback, 10)
@@ -63,6 +65,7 @@ class Mapping(Node):
             case 4: # Quadrant 4
                 self.global_position = [round(self.global_rows*0.25), round(self.global_cols*0.25)]
 
+        #Other variables from topics
         self.objects = None
         self.locations = None
         self.current_position = self.global_position
@@ -199,11 +202,14 @@ class Mapping(Node):
         self.get_local_map()
 
     def phone_callback(self, msg: Float32MultiArray) -> None:
-        """ 
-        Callback function for the phone subscription. Updates the current position and heading based on phone data. 
-        
+        """Handle incoming phone telemetry and update current position, speed, and heading.
+
         Args:
-            msg (Float32MultiArray): The message received from the phone topic, containing position and heading data
+            msg: Float32MultiArray where
+                index 0 is latitude
+                index 1 is longitude
+                index 2 is speed
+                index 3 is heading.
         """
         data = msg.data
         self.get_logger().info(f"Phone: {msg.data}")

@@ -1,13 +1,13 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
+import threading
 import numpy as np
 import time
 import busio
 import board
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
-import threading
 
 class Motor(Node):
     """ROS2 node that controls motor outputs via a PCA9685 PWM driver.
@@ -68,10 +68,12 @@ class Motor(Node):
         self._init_pca(freq)
         self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
 
+        #Other internal variables
         self.i = 0
         self.last_error = 0
         self.last_time = time.time()
 
+        #Other variables from topics
         self.current_speed = np.nan
         self.current_heading = np.nan
         self.target_heading = None
@@ -79,8 +81,9 @@ class Motor(Node):
 
         # Spin until data is received
         self.get_logger().info('waiting for phone and task data...')
-        while not self.phone_data_ready_event.is_set() or not self.task_data_ready_event.is_set():
-            rclpy.spin_once(self, timeout_sec=0.1)
+        while not (self.phone_data_ready_event.is_set()
+                   and self.task_data_ready_event.is_set()):
+            rclpy.spin_once(self, timeout_sec = 0.1)
         self.get_logger().info('phone and task data received, starting motor control loop.')
 
     def _init_pca(self, freq) -> None:
@@ -349,10 +352,14 @@ class Motor(Node):
                     self.turn_in_place()
 
     def phone_callback(self, msg) -> None:  
-        """Handle incoming phone telemetry and update current speed and heading.
+        """Handle incoming phone telemetry and update current position, speed, and heading.
 
         Args:
-            msg: Float32MultiArray where index 2 is speed and index 3 is heading.
+            msg: Float32MultiArray where
+                index 0 is latitude
+                index 1 is longitude
+                index 2 is speed
+                index 3 is heading.
         """
         data = msg.data
         self.get_logger().info(f"Phone: {msg.data}")

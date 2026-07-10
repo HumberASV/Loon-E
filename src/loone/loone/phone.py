@@ -1,10 +1,10 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
+import threading
 import numpy as np
 import socket
 import subprocess
-import threading
 
 class Phone(Node):
     """
@@ -23,11 +23,11 @@ class Phone(Node):
         Initialize the Phone node.
         Node uses Android Debug Bridge (ADB) to get the phone's GPS coordinates, speed, and heading.
         """
-        self.heading = np.nan
-        self.speed = np.nan
-        self.latitude = np.nan
-        self.longitude = np.nan
+        super().__init__('Phone_Pub')
 
+        #Publishers
+        self.phone_pub = self.create_publisher(Float32MultiArray, 'phone', 10)
+        
         # Declare parameters with fallback/default values
         self.declare_parameter('phone_port', 5000)
         self.declare_parameter('computer_port', 5000)
@@ -37,12 +37,16 @@ class Phone(Node):
         self.PHONE_PORT = self.get_parameter('phone_port').value
         self.PORT = self.get_parameter('computer_port').value
         self.HOST = self.get_parameter('host').value
-
         self.get_adb_devices()
         self.route_adb()
+
+        #Other internal variables
+        self.heading = np.nan
+        self.speed = np.nan
+        self.latitude = np.nan
+        self.longitude = np.nan
         
-        super().__init__('Phone_Pub') # Why is this here? ~ Carson
-        self.phone_pub = self.create_publisher(Float32MultiArray, 'phone', 10)
+        #Thread
         self.receiver = threading.Thread(target = self.get_odometry, daemon = True)
         self.receiver.start()
         self.get_logger().info(f"Phone node initialized. Listening on {self.HOST}:{self.PORT} and routing to phone port {self.PHONE_PORT}.")
