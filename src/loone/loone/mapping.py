@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray, Int8MultiArray, MultiArrayDimension
+from geometry_msgs.msg import Polygon
 import numpy as np
 import math
 
@@ -14,8 +15,9 @@ class Mapping(Node):
         """ Initialize the Mapping node and set up publishers and subscribers. """
         super().__init__('Map_PubSub')
         self.global_pub = self.create_publisher(Int8MultiArray, 'global', 10)
-        self.position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
-        self.objects_sub = self.create_subscription(Float32MultiArray, 'objects', self.object_callback, 10)
+        self.current_position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
+        self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback, 10)
+        self.locations_sub = self.create_subscription(Polygon, 'locations', self.location_callback, 10)
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
 
         # Declare parameters with fallback/default values
@@ -38,12 +40,12 @@ class Mapping(Node):
         self.local_cols = self.get_cell(self.local_l)
         self.global_rows = self.get_cell(self.global_w)
         self.global_cols = self.get_cell(self.global_l)
-        self.local_map = []
-        self.global_map = np.zeros((self.global_rows, self.global_cols))
+        self.local_map = np.zeros((0))
+        self.global_map = np.zeros((self.global_rows, self.global_cols), dtype = np.int8)
 
         match start_position:
             case 0: # Origin
-                self.global_position = [round(self.global_rows)*0.5, round(self.global_cols*0.5)]
+                self.global_position = [round(self.global_rows*0.5), round(self.global_cols*0.5)]
             case 0.5: # Positive Y axis
                 self.global_position = [round(self.global_rows*0.25), round(self.global_cols*0.5)]
             case 1: # Quadrant 1
@@ -63,23 +65,31 @@ class Mapping(Node):
 
         self.objects = None
         self.locations = None
-        self.position = self.global_position
-        self.position_0 = [None, None]
+        self.current_position = self.global_position
+        self.previous_position = [None, None]
         self.heading = None
 
     #ROS - Publish
-    def publish(self) -> None:
+    def publish_map(self) -> None:
         """ Publish the global map as an Int8MultiArray message. """
+        rows, cols, objects = self.global_map.shape
+        
         msg = Int8MultiArray()
-        msg.data = self.global_map
+        msg.layout.dim = [
+            MultiArrayDimension(label="rows", size = rows, stride = rows * cols * objects),
+            MultiArrayDimension(label="columns", size = cols, stride = cols * objects),
+            MultiArrayDimension(label="objects", size = objects, stride = objects)
+        ]
+        msg.data = self.global_map.flatten().tolist()
+
         self.global_pub.publish(msg)
         self.get_logger().info(f"Map: {msg.data}")
 
     def publish_position(self) -> None:
-        """ Publish the current position as a Float32MultiArray message. """
-        msg = Float32MultiArray()
+        """ Publish the current position as a Int8MultiArray message. """
+        msg = Int8MultiArray()
         msg.data = self.global_position
-        self.position_pub.publish(msg)
+        self.current_position_pub.publish(msg)
         self.get_logger().info(f"Position: {msg.data}")
     
     #General Code
@@ -111,14 +121,12 @@ class Mapping(Node):
         # This might be a bug. ~ Carson
         y = self.get_cell((start[0] - end[0]) * 111000)
         x = self.get_cell((start[1] - end[1]) * 111000 * math.cos(lat))
-        # NOTE: Why is the y-coordinate calculated using start[0] and end[0], while the x-coordinate uses start[1] and end[1]?
-        # This seems inconsistent with x,y coordinates as this is y,x. It might be a bug. ~ Carson
         self.global_position[0] += y
         self.global_position[1] += x
     
     def get_global_map(self) -> None:
         """ Update the global map based on the local map and the current position and heading. """
-        self.get_map_cell(self.position_0, self.position)
+        self.get_map_cell(self.previous_position, self.current_position)
         mid = round((self.global_cols - 1) / 2)
         for i in range(self.global_rows):
             for j in range(self.global_cols):
@@ -137,11 +145,11 @@ class Mapping(Node):
                     global_y = round(r*math.cos(theta)) + self.global_position[1]
                     self.global_map[global_y][global_x] = self.local_map[i][j]
         
-        self.publish()
+        self.publish_map()
 
     def get_local_map(self) -> None:
         """ Update the local map based on detected obstacles and their locations. """
-        self.local_map = np.zeros((self.local_rows, self.local_cols))
+        self.local_map = np.zeros((self.local_rows, self.local_cols), dtype = np.int8)
 
         for i in range(len(self.obstacles)):
             obstacle = self.obstacles[i]
@@ -149,52 +157,59 @@ class Mapping(Node):
 
             match obstacle: #Values rounded up to nearest whole cell length, assuming resolution of 0.5 m
                 case _:
-                    obj_length = 0.5
-                    obj_width = 0.5
+                    objL = 0.5
+                    objW = 0.5
 
             # Convert world units to grid cells
-            objL = self.get_cell(obj_length)
-            objW = self.get_cell(obj_width)
+            objL = self.get_cell(objL)
+            objW = self.get_cell(objW)
 
             # X and Y coordinates of the object in the local map
-            # NOTE: inconsistency in the order of coordinates (X, Y) vs (Y, X) might lead to confusion. ~ Carson
-            objStartX = self.get_cell(location[0])
-            objStartY = self.get_cell(location[1]) 
+            objStartY = self.get_cell(location[0])
+            objStartX = self.get_cell(location[1]) 
 
             # Write into the matrix
             for i in range(objL):
                 for j in range(objW):
                     self.map[objStartY + j, objStartX + i] = obstacle
         
-        if self.position is not None and self.heading is not None:
+        if self.current_position is not None and self.heading is not None:
             self.get_global_map()
     
     #ROS - Subscribe
-    def object_callback(self, msg: CustomMsg) -> None:
+    def object_callback(self, msg: Int8MultiArray) -> None:
         """ 
-        Callback function for the objects subscription. Updates the detected objects and their locations. 
+        Callback function for the objects subscription. Updates the detected objects. 
         
         Args:
-            msg (CustomMsg): The message received from the objects topic, containing detected objects and their
+            msg (Int8MultiArray): The message received from the objects topic, containing detected objects.
         """
-        data = msg.data
         self.get_logger().info(f"Objects: {msg.data}")
-        self.objects = data[0]
-        self.locations = data[1]
+        self.objects = msg.data
+        self.get_local_map()
+    
+    def location_callback(self, msg: Polygon) -> None:
+        """Callback function for the locations subscription. Updates the list of detected objects' locations.
+        
+        Args:
+            msg (Polygon): The message received from the locations topic, containing detected objects' locations.
+        """
+        self.get_logger().info(f"Locations: {msg.data}")
+        self.locations = [[p.y, p.x] for p in msg.points]
         self.get_local_map()
 
-    def phone_callback(self, msg: CustomMsg) -> None:
+    def phone_callback(self, msg: Float32MultiArray) -> None:
         """ 
         Callback function for the phone subscription. Updates the current position and heading based on phone data. 
         
         Args:
-            msg (CustomMsg): The message received from the phone topic, containing position and heading data
+            msg (Float32MultiArray): The message received from the phone topic, containing position and heading data
         """
         data = msg.data
         self.get_logger().info(f"Phone: {msg.data}")
-        if data[0] != self.position_0[0] or data[1] != self.position_0[1]:
-            self.position_0 = self.position
-        self.position = [data[0], data[1], self.local_w, self.res]
+        if data[0] != self.previous_position[0] or data[1] != self.previous_position[1]:
+            self.previous_position = self.current_position
+            self.current_position = [data[0], data[1]]
         self.heading = data[3]
     
 def main(args = None):

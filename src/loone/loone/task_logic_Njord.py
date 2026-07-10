@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray, Int8MultiArray, MultiArrayDimension
+from std_msgs.msg import Float32MultiArray, Int8MultiArray
+from geometry_msgs.msg import Polygon, Point32
 import numpy as np
 import time
 import math
@@ -16,18 +17,29 @@ OTTER = 6
 
 class Task(Node):
     """
-    A ROS2 node that publishes task commands to various topics.
+    A ROS2 node that acts as the central control node for the Loon-E.
+    
+    Receives:
+        List of visible objects from Camera Node
+        Telemetry data from Phone Node
+        Position in global map from Mapping Node
+        List of waypoints from Path Planning Node
+    
+    Sends:
+        Current and target global map positions to Path Planning Node
+        Motor commands (type of action, target heading, target speed, direction) to Motor Node
     """
 
     def __init__(self):
         """ Initialize the Task node and set up the publisher and timer. """
         super().__init__('Task_PubSub')
-        self.path_pub = self.create_publisher(Int8MultiArray, 'Task_Path', 10)
-        self.motor_pub = self.create_publisher(Float32MultiArray, 'Task_Motor', 10)
-        self.objects_sub = self.create_subscription(Float32MultiArray, 'Objects', self.object_callback(), 10)
-        self.phone_sub = self.create_subscription(Float32MultiArray, 'Phone', self.phone_callback(), 10)
-        self.position_sub = self.create_subscription(Int8MultiArray, 'Position', self.position_callback(), 10)
-        self.path_sub = self.create_subscription(Int8MultiArray, 'Path', self.path_callback(), 10)
+        self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
+        self.motor_pub = self.create_publisher(Float32MultiArray, 'task_motor', 10)
+        self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback(), 10)
+        self.locations_sub = self.create_subscription(Polygon, 'locations', self.location_callback, 10)
+        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback(), 10)
+        self.position_sub = self.create_subscription(Int8MultiArray, 'position', self.position_callback(), 10)
+        self.path_sub = self.create_subscription(Polygon, 'path', self.path_callback(), 10)
         
         #Declare parameters with fallback/default values
         self.declare_parameter('local_l', 20)
@@ -81,8 +93,14 @@ class Task(Node):
         Args:
             data: Message content in form [global position, target position]
         """
-        msg = Int8MultiArray()
-        msg.data = data
+        msg = Polygon()
+
+        for position in data:
+            point = Point32()
+            point.y = position[0]
+            point.x = position[1]
+            msg.points.append(point)
+        
         self.path_pub.publish(msg)
         self.get_logger().info(f"Path: {msg.data}")
     
@@ -200,6 +218,7 @@ class Task(Node):
         data = [self.global_position, target_position]
         self.publish_path(data)
         
+        #Wait for waypoint data to be received
         if self.waypoints is not None:
             target_heading = self.get_coordinate(self.position, self.waypoints)[1]
             data = [1.0, target_heading, 2.0, np.nan]
@@ -321,14 +340,26 @@ class Task(Node):
             case 4: self.task_4()
     
     #ROS - Subscribe
-    def object_callback(self, msg):
-        data = msg.data
+    def object_callback(self, msg: Int8MultiArray) -> None:
+        """ 
+        Callback function for the objects subscription. Updates the detected objects. 
+        
+        Args:
+            msg (Int8MultiArray): The message received from the objects topic, containing detected objects.
+        """
         self.get_logger().info(f"Objects: {msg.data}")
-        self.objects = data[0]
-        self.locations = data[1]
-        self.get_local_map()
+        self.objects = msg.data
+    
+    def location_callback(self, msg: Polygon) -> None:
+        """Callback function for the locations subscription. Updates the list of detected objects' locations.
+        
+        Args:
+            msg (Polygon): The message received from the locations topic, containing detected objects' locations.
+        """
+        self.get_logger().info(f"Locations: {msg.data}")
+        self.locations = [[p.y, p.x] for p in msg.points]
 
-    def phone_callback(self, msg):
+    def phone_callback(self, msg: Float32MultiArray) -> None:
         """Handle incoming phone telemetry and update current position, speed, and heading.
 
         Args:
@@ -339,7 +370,7 @@ class Task(Node):
                 index 3 is heading.
         """
         data = msg.data
-        self.get_logger().info(f"Phone: {msg.data}")
+        self.get_logger().info(f"Phone: {data}")
         self.position = [data[0], data[1]]
         self.speed = data[2]
         self.heading = data[3]
@@ -353,18 +384,17 @@ class Task(Node):
                 index 1 is horizontal position in global map
         """
         data = msg.data
-        self.get_logger().info(f"Position: {msg.data}")
+        self.get_logger().info(f"Position: {data}")
         self.global_position = [data[0], data[1]]
     
     def path_callback(self, msg):
         """Handle incoming data and update current waypoint list.
 
         Args:
-            msg: Int8MultiArray of waypoints.
+            msg: Polygon of waypoints.
         """
-        data = msg.data
         self.get_logger().info(f"Path: {msg.data}")
-        self.waypoints = data
+        self.waypoints = [[p.y, p.x] for p in msg.points]
 
 def main(args = None):
     """ Main function to initialize the ROS2 node and start spinning. """

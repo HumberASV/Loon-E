@@ -148,7 +148,7 @@ class Motor(Node):
             )
             raise ValueError(f"Pulse range out of hardware limits for {channel_name}")
             
-    def publish(self) -> None:
+    def publish_motor(self) -> None:
         # Publish the current motor state
         msg = Float32MultiArray()
         msg.data = [self.prop_l.fraction, self.prop_r.fraction, self.rudder.fraction]
@@ -245,13 +245,14 @@ class Motor(Node):
         self.prop_l.fraction = 0 #max backward
         self.prop_r.fraction = 0 #max backward
         self.rudder.fraction = self.center #0 degrees
-        self.publish()
+        self.publish_motor()
     
     def stop(self) -> None:
         """Set propeller and rudder PWM to center/no motion"""
         self.prop_l.fraction = 0.5 #no motion
         self.prop_r.fraction = 0.5 #no motion
         self.rudder.fraction = self.center #0 degrees
+        self.publish_motor()
 
     def turn_in_place(self) -> None:
         """Set PWM to turn in place"""
@@ -265,7 +266,7 @@ class Motor(Node):
             self.prop_r.fraction = self.get_fraction(1460) #min backward 
             self.rudder.fraction = self.center #0 degrees
         
-        self.publish()
+        self.publish_motor()
 
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
@@ -325,7 +326,7 @@ class Motor(Node):
                 
             self.last_error = current_error
             self.last_time = current_time
-            self.publish()
+            self.publish_motor()
         
         else:
             self.dir = current_error

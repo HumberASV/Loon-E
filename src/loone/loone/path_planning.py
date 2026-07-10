@@ -1,6 +1,7 @@
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Int8MultiArray
+from geometry_msgs.msg import Polygon, Point32
 import numpy as np
 
 class Path(Node):
@@ -14,10 +15,9 @@ class Path(Node):
     def __init__(self):
         """ Initialize the Path node and set up the publisher and subscriptions. """
         super().__init__('Path_PubSub')
-        self.path_pub = self.create_publisher(Int8MultiArray, 'path', 10)
+        self.path_pub = self.create_publisher(Polygon, 'path', 10)
         self.map_sub = self.create_subscription(Int8MultiArray, 'global', self.map_callback(), 10)
-        self.task_sub = self.create_subscription(Int8MultiArray, 'task_path', self.task_callback(), 10)
-
+        self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback(), 10)
 
         # Declare parameters with fallback/default values
         self.declare_parameter('dist', 4)
@@ -31,23 +31,34 @@ class Path(Node):
         self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
 
 
-        self.map = None
-        self.x_start = None
-        self.y_start = None
-        self.x_end = None
-        self.y_end = None
+        self.map = []
+        self.x_start = np.nan
+        self.y_start = np.nan
+        self.x_end = np.nan
+        self.y_end = np.nan
 
     #ROS - Publish
-    def publish(self):
-        """ Publish the waypoints as an Int8MultiArray message. """
-        msg = Int8MultiArray()
-        msg.data = self.waypoints
+    def publish_path(self):
+        """ Publish the waypoints as a Polygon message. """
+        msg = Polygon()
+
+        for position in self.waypoints:
+            point = Point32()
+            point.y = position[0]
+            point.x = position[1]
+            msg.points.append(point)
+        
         self.path_pub.publish(msg)
         self.get_logger().info(f"{msg.data}")
 
     #General Code
     def point_in_map(self, position):
-        """ Check if a given position is within the bounds of the map. """
+        """ Check if a given position is within the bounds of the map.
+        Args:
+            position (tuple): The (y, x) coordinates of the point to check.
+        Returns:
+            bool: True if the point is outside the map, False otherwise
+        """
         rows = len(self.map)
         cols = len(self.map[0])
         output = False
@@ -80,7 +91,7 @@ class Path(Node):
 
     def pathfind(self, start: tuple, expanded: list) -> list:
         """
-        Find the path from the start position to the end position using the expanded nodes.
+        Find the path from the end position to the start position using the expanded nodes.
 
         Args:
             start (tuple): The starting position (y, x).
@@ -119,7 +130,6 @@ class Path(Node):
         Returns:
             None
         """
-         # NOTE: WHY IS THIS IN (Y, X) FORMAT? ~ Carson
         y = position[0]
         x = position[1]
 
@@ -168,7 +178,7 @@ class Path(Node):
         start = self.path[self.path.index(point) - 1]
         end_index = self.path.index(point)
         end = self.path[end_index]
-        position = (start[0], start[1]) #NOTE: x, y? but we are using y, x format for points ~ Carson
+        position = (start[0], start[1])
 
         while self.find_obstacle(end) and (end_index != len(self.path_obstacles) - 1): #move destination further away so it does not intersect with an obstacle
             self.path.remove(end)
@@ -190,7 +200,7 @@ class Path(Node):
         
     def make_waypoints(self) -> None:
         """
-        Create waypoints along the path, avoiding obstacles.
+        Create waypoints along the path, checking for points that are in range of obstacles.
         """
         self.path_obstacles = self.path
 
@@ -199,14 +209,14 @@ class Path(Node):
                 self.avoid_obstacle(point)
                 
         for point in self.path_obstacles:
-            y = point[0] # NOTE: wouldn't it be better to use y = point[1] and x = point[0] since the point is in (y, x) format? ~ Carson
+            y = point[0]
             x = point[1]
             if ((self.path_obstacles.index(point) % self.dist == 0) or (point == self.path_obstacles[-1])): #Add every d points to waypoint list and last waypoint
                 self.waypoints.append(point)
 
     def get_path(self) -> None:
         """
-        Generate the path from start to end, avoiding obstacles.
+        Generate the path from start to end, not avoiding obstacles.
         """
         while self.find_obstacle((self.y_end, self.x_end)): #Ensure that end point is not near obstacle
             self.y_end = self.y_end - 1 #UPDATE
@@ -234,24 +244,23 @@ class Path(Node):
                 self.path.append((y, x)) #Add point to path
         
         self.make_waypoints()
-        self.publish()
+        self.publish_path()
     
     #ROS - Subscribe
     def map_callback(self, msg) -> None:
         """ Callback function for the map subscription. Updates the internal map representation. """
-        data = msg.data
         self.get_logger().info(f"Map: {msg.data}")
-        self.map = data
+        shape = [d.size for d in msg.layout.dim]
+        self.map = np.array(msg.data, dtype=np.int8).reshape(shape)
 
-    def task_callback(self, msg: Int8MultiArray) -> None:
+    def task_callback(self, msg: Polygon) -> None:
         """ Callback function for the task subscription. Updates the start and end positions. """
-        data = msg.data
         self.get_logger().info(f"Task: {msg.data}")
-        self.y_start = data[0]
-        self.x_start = data[1]
-        self.y_end = data[2]
-        self.x_end = data[3]
-        if self.map is not None:
+        self.y_start = msg.points[0].y
+        self.x_start = msg.points[0].x
+        self.y_end = msg.points[1].y
+        self.x_end = msg.points[1].x
+        if self.map != []:
             self.get_path()
     
 def main(args = None):

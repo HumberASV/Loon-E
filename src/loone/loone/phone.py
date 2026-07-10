@@ -47,7 +47,7 @@ class Phone(Node):
         self.receiver.start()
         self.get_logger().info(f"Phone node initialized. Listening on {self.HOST}:{self.PORT} and routing to phone port {self.PHONE_PORT}.")
 
-    def publish(self):
+    def publish_phone(self):
         msg = Float32MultiArray()
         msg.data = [self.latitude, self.longitude, self.speed, self.heading]
         self.phone_pub.publish(msg)
@@ -91,7 +91,7 @@ class Phone(Node):
                             except Exception as e:
                                 continue
                             
-                            self.publish()
+                            self.publish_phone()
     
     def get_adb_devices(self):
         # Execute native 'adb devices' in terminal
