@@ -1,7 +1,8 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray, Int8MultiArray, MultiArrayDimension
+from std_msgs.msg import Float32MultiArray, Int8MultiArray
 from geometry_msgs.msg import Polygon
+from nav_msgs.msg import OccupancyGrid
 import numpy as np
 import math
 
@@ -16,7 +17,7 @@ class Mapping(Node):
         super().__init__('Map_PubSub')
 
         #Publishers and Subscribers
-        self.global_pub = self.create_publisher(Int8MultiArray, 'global', 10)
+        self.global_pub = self.create_publisher(OccupancyGrid, 'global', 10)
         self.current_position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
         self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback, 10)
         self.locations_sub = self.create_subscription(Polygon, 'locations', self.location_callback, 10)
@@ -38,11 +39,12 @@ class Mapping(Node):
         self.res      = self.get_parameter('res').value
         start_position = self.get_parameter('start_position').value
 
+        #Other internal variables
         self.local_rows = self.get_cell(self.local_w)
         self.local_cols = self.get_cell(self.local_l)
         self.global_rows = self.get_cell(self.global_w)
         self.global_cols = self.get_cell(self.global_l)
-        self.local_map = np.zeros((0))
+        self.local_map = np.zeros(0)
         self.global_map = np.zeros((self.global_rows, self.global_cols), dtype = np.int8)
 
         match start_position:
@@ -75,14 +77,9 @@ class Mapping(Node):
     #ROS - Publish
     def publish_map(self) -> None:
         """ Publish the global map as an Int8MultiArray message. """
-        rows, cols, objects = self.global_map.shape
-        
-        msg = Int8MultiArray()
-        msg.layout.dim = [
-            MultiArrayDimension(label="rows", size = rows, stride = rows * cols * objects),
-            MultiArrayDimension(label="columns", size = cols, stride = cols * objects),
-            MultiArrayDimension(label="objects", size = objects, stride = objects)
-        ]
+        msg = OccupancyGrid()
+        msg.info.resolution = self.res
+        msg.info.height, msg.info.width = self.global_map.shape
         msg.data = self.global_map.flatten().tolist()
 
         self.global_pub.publish(msg)
@@ -174,7 +171,7 @@ class Mapping(Node):
             # Write into the matrix
             for i in range(objL):
                 for j in range(objW):
-                    self.map[objStartY + j, objStartX + i] = obstacle
+                    self.map[objStartY + j, objStartX + i] = 1
         
         if self.current_position is not None and self.heading is not None:
             self.get_global_map()

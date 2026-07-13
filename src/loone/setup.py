@@ -32,7 +32,6 @@ setup(
             'mapping = loone.mapping:main',
             'path_planning = loone.path_planning:main',
             'motor = loone.motor:main',
-            'led = loone.led:main',
         ],
     },
 )

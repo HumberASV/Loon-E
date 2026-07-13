@@ -1,7 +1,7 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int8MultiArray
 from geometry_msgs.msg import Polygon, Point32
+from nav_msgs.msg import OccupancyGrid
 import numpy as np
 
 class Path(Node):
@@ -18,7 +18,7 @@ class Path(Node):
 
         #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'path', 10)
-        self.map_sub = self.create_subscription(Int8MultiArray, 'global', self.map_callback(), 10)
+        self.map_sub = self.create_subscription(OccupancyGrid, 'global', self.map_callback(), 10)
         self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback(), 10)
 
         # Declare parameters with fallback/default values
@@ -33,7 +33,7 @@ class Path(Node):
         self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
 
         #Other variables from topics
-        self.map = np.array([])
+        self.map = np.zeros(0)
         self.x_start = np.nan
         self.y_start = np.nan
         self.x_end = np.nan
@@ -285,8 +285,7 @@ class Path(Node):
     def map_callback(self, msg) -> None:
         """ Callback function for the map subscription. Updates the internal map representation. """
         self.get_logger().info(f"Map: {msg.data}")
-        shape = [d.size for d in msg.layout.dim]
-        self.map = np.array(msg.data, dtype=np.int8).reshape(shape)
+        self.map = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
 
     def task_callback(self, msg: Polygon) -> None:
         """ Callback function for the task subscription. Updates the start and end positions. """

@@ -76,8 +76,8 @@ class Motor(Node):
         #Other variables from topics
         self.current_speed = np.nan
         self.current_heading = np.nan
-        self.target_heading = None
-        self.target_speed = None
+        self.target_heading = np.nan
+        self.target_speed = np.nan
 
         # Spin until data is received
         self.get_logger().info('waiting for phone and task data...')
