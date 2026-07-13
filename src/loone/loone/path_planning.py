@@ -34,10 +34,10 @@ class Path(Node):
 
         #Other variables from topics
         self.map = np.zeros(0)
-        self.x_start = -999
-        self.y_start = -999
-        self.x_end = -999
-        self.y_end = -999
+        self.x_start = np.nan
+        self.y_start = np.nan
+        self.x_end = np.nan
+        self.y_end = np.nan
 
     #ROS - Publish
     def publish_path(self):
@@ -294,7 +294,7 @@ class Path(Node):
         self.x_start = msg.points[0].x
         self.y_end = msg.points[1].y
         self.x_end = msg.points[1].x
-        if self.map != np.array([]):
+        if self.map is not None and self.map.size > 0:
             self.get_path()
     
 def main(args = None):

@@ -3,7 +3,6 @@ from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray, Int8MultiArray
 from geometry_msgs.msg import Polygon
 from nav_msgs.msg import OccupancyGrid
-import threading
 import numpy as np
 import math
 
@@ -72,11 +71,11 @@ class Mapping(Node):
                 self.global_position = [round(self.global_rows*0.25), round(self.global_cols*0.25)]
 
         #Other variables from topics
-        self.objects = [-999]
-        self.locations = [[-999, -999]]
+        self.objects = [np.nan]
+        self.locations = [[np.nan, np.nan]]
         self.current_position = self.global_position
-        self.previous_position = [-999, -999]
-        self.heading = -999
+        self.previous_position = [np.nan, np.nan]
+        self.heading = np.nan
 
         # Spin until data is received
         self.get_logger().info('waiting for phone data...')
@@ -183,7 +182,7 @@ class Mapping(Node):
                 for j in range(objW):
                     self.map[objStartY + j, objStartX + i] = 1
         
-        if (self.current_position != -999) and (self.heading != -999):
+        if (self.current_position is not None and not np.isnan(self.current_position[0])) and (self.heading is not None and not np.isnan(self.heading)):
             self.get_global_map()
     
     #ROS - Subscribe
