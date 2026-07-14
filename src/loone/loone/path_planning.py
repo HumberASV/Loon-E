@@ -18,8 +18,10 @@ class Path(Node):
 
         #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'path', 10)
-        self.map_sub = self.create_subscription(OccupancyGrid, 'global', self.map_callback(), 10)
-        self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback(), 10)
+        # Pass the callback function itself; ROS invokes it later when a map arrives.
+        self.map_sub = self.create_subscription(OccupancyGrid, 'global', self.map_callback, 10)
+        # Pass the callback function itself; ROS invokes it when a task path arrives.
+        self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback, 10)
 
         # Declare parameters with fallback/default values
         self.declare_parameter('dist', 4)
@@ -51,7 +53,8 @@ class Path(Node):
             msg.points.append(point)
         
         self.path_pub.publish(msg)
-        self.get_logger().info(f"{msg.data}")
+        # Polygon messages carry points, not a data field.
+        self.get_logger().info(f"{msg.points}")
 
     #General Code
     def point_in_map(self, position):
@@ -112,9 +115,9 @@ class Path(Node):
                 if self.point_in_map(position) and (self.map[i][j] != 0): #If obstacle in range
                     obstacles.append((y - i, x - j))
         
-        obstacles = zip(obstacles)
-        dy = sum(obstacles)[0] / len(obstacles)[0]
-        dx = sum(obstacles)[1] / len(obstacles)[1]
+        obstacles = list(zip(*obstacles))
+        dy = sum(obstacles[0]) / len(obstacles[0])
+        dx = sum(obstacles[1]) / len(obstacles[1])
         average = (y + np.sign(dy), x + np.sign(dx))
         if not self.point_in_map(average):
             average = (y - 2 * dy, x - 2 * dx) #Point "jumps over" obstacle
@@ -252,7 +255,8 @@ class Path(Node):
         """
         #Defensive Checks
         while self.find_obstacle((self.y_end, self.x_end)): #Ensure that end point is not near obstacle
-            y, x = self.get_obstacles(self.y_end, self.x_end)
+            # Use the local helper name; this returns the obstacle offset used to nudge the endpoint.
+            y, x = self.get_obstacle((self.y_end, self.x_end))
             self.y_end = self.y_end + y #Move point in direction opposite average of nearby obstacles
             self.x_end = self.x_end + x
         
@@ -289,7 +293,8 @@ class Path(Node):
 
     def task_callback(self, msg: Polygon) -> None:
         """ Callback function for the task subscription. Updates the start and end positions. """
-        self.get_logger().info(f"Task: {msg.data}")
+        # Polygon messages expose their coordinates through points, not data.
+        self.get_logger().info(f"Task: {msg.points}")
         self.y_start = msg.points[0].y
         self.x_start = msg.points[0].x
         self.y_end = msg.points[1].y

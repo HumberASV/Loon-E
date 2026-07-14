@@ -5,6 +5,7 @@ from geometry_msgs.msg import Polygon
 from nav_msgs.msg import OccupancyGrid
 import numpy as np
 import math
+import threading
 
 class Mapping(Node):
     """ A ROS2 node that manages the mapping of the environment based on data from various sources.
@@ -16,7 +17,7 @@ class Mapping(Node):
         """ Initialize the Mapping node and set up publishers and subscribers. """
         super().__init__('Map_PubSub')
 
-        #Events
+        # Event used to block startup until the first phone update arrives.
         self.phone_data_ready_event = threading.Event()
         
         #Publishers and Subscribers
@@ -96,7 +97,9 @@ class Mapping(Node):
 
     def publish_position(self) -> None:
         """ Publish the current position as a Int8MultiArray message. """
-        msg = Int8MultiArray()
+        # The position publisher is typed as Float32MultiArray, so publish the
+        # current coordinates in that matching message type.
+        msg = Float32MultiArray()
         msg.data = self.global_position
         self.current_position_pub.publish(msg)
         self.get_logger().info(f"Position: {msg.data}")

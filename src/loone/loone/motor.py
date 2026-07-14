@@ -78,6 +78,7 @@ class Motor(Node):
         self.current_heading = np.nan
         self.target_heading = np.nan
         self.target_speed = np.nan
+        self.dir = np.nan
 
         # Spin until data is received
         self.get_logger().info('waiting for phone and task data...')
@@ -275,8 +276,8 @@ class Motor(Node):
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()
         
-        #defensive check to ensure we have valid target and current heading/speed values, not being np.nan, or None
-        if any(value is None or np.isnan(value) for value in [
+        # Defensive check to ensure we have valid target and current heading/speed values.
+        if any(np.isnan(value) for value in [
             self.current_heading, self.target_heading, self.current_speed, self.target_speed]):
             self.get_logger().warning(
                 "Invalid heading/speed values detected. Skipping PID cycle."
@@ -350,7 +351,7 @@ class Motor(Node):
                 self.drive()
             
             case 2: #turn
-                if self.dir is not None or not np.isnan(self.dir):
+                if not np.isnan(self.dir):
                     self.turn_in_place()
 
     def phone_callback(self, msg) -> None:  
