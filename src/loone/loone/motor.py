@@ -272,12 +272,20 @@ class Motor(Node):
         
         self.publish_motor()
 
+    @staticmethod
+    def _is_valid_numeric_value(value) -> bool:
+        """Return True for numeric values that are not NaN."""
+        try:
+            return not np.isnan(value)
+        except (TypeError, ValueError):
+            return False
+
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()
         
         # Defensive check to ensure we have valid target and current heading/speed values.
-        if any(np.isnan(value) for value in [
+        if any(not self._is_valid_numeric_value(value) for value in [
             self.current_heading, self.target_heading, self.current_speed, self.target_speed]):
             self.get_logger().warning(
                 "Invalid heading/speed values detected. Skipping PID cycle."
@@ -351,7 +359,7 @@ class Motor(Node):
                 self.drive()
             
             case 2: #turn
-                if not np.isnan(self.dir):
+                if self._is_valid_numeric_value(self.dir):
                     self.turn_in_place()
 
     def phone_callback(self, msg) -> None:  
