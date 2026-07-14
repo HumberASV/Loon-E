@@ -2,6 +2,7 @@ import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray, Int8MultiArray
 from geometry_msgs.msg import Polygon, Point32
+from zed_msgs.msg import ObjectsStamped
 import threading
 import numpy as np
 import time
@@ -45,11 +46,12 @@ class Task(Node):
         #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
         self.motor_pub = self.create_publisher(Float32MultiArray, 'task_motor', 10)
-        self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback(), 10)
-        self.locations_sub = self.create_subscription(Polygon, 'locations', self.location_callback, 10)
-        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback(), 10)
-        self.position_sub = self.create_subscription(Int8MultiArray, 'position', self.position_callback(), 10)
-        self.path_sub = self.create_subscription(Polygon, 'path', self.path_callback(), 10)
+        # ZED now provides both object IDs and object positions, so the task
+        # node no longer needs the separate locations topic.
+        self.objects_sub = self.create_subscription(ObjectsStamped, 'objects', self.object_callback, 10)
+        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
+        self.position_sub = self.create_subscription(Int8MultiArray, 'position', self.position_callback, 10)
+        self.path_sub = self.create_subscription(Polygon, 'path', self.path_callback, 10)
         
         #Declare parameters with fallback/default values
         self.declare_parameter('local_l', 20)
@@ -384,7 +386,6 @@ class Task(Node):
         while True:
             #Spin until data is received
             while not (self.object_data_ready_event.is_set()
-                       and self.location_data_ready_event.is_set()
                        and self.phone_data_ready_event.is_set()
                        and self.position_data_ready_event.is_set()):
                 rclpy.spin_once(self, timeout_sec = 0.1)
@@ -403,25 +404,21 @@ class Task(Node):
             self.position_data_ready_event.clear()
     
     #ROS - Subscribe
-    def object_callback(self, msg: Int8MultiArray) -> None:
+    def object_callback(self, msg: ObjectsStamped) -> None:
         """ 
         Callback function for the objects subscription. Updates the detected objects. 
         
         Args:
-            msg (Int8MultiArray): The message received from the objects topic, containing detected objects.
+            msg (ObjectsStamped): The ZED message received from the objects topic, containing detected objects.
         """
-        self.get_logger().info(f"Objects: {msg.data}")
-        self.objects = msg.data
+        # Store ZED label IDs for task logic and keep each object's reported
+        # position alongside it for the stage logic that reasons about location.
+        self.get_logger().info(f"Objects: {msg.objects}")
+        self.objects = [obj.label_id for obj in msg.objects]
+        self.locations = [[obj.position[1], obj.position[0]] for obj in msg.objects]
         self.object_data_ready_event.set()
-    
-    def location_callback(self, msg: Polygon) -> None:
-        """Callback function for the locations subscription. Updates the list of detected objects' locations.
-        
-        Args:
-            msg (Polygon): The message received from the locations topic, containing detected objects' locations.
-        """
-        self.get_logger().info(f"Locations: {msg.data}")
-        self.locations = [[p.y, p.x] for p in msg.points]
+        # Keep the legacy event set so the task loop can proceed without the
+        # removed locations topic.
         self.location_data_ready_event.set()
 
     def phone_callback(self, msg: Float32MultiArray) -> None:
@@ -439,6 +436,7 @@ class Task(Node):
         self.position = [data[0], data[1]]
         self.speed = data[2]
         self.heading = data[3]
+        self.phone_data_ready_event.set()
     
     def position_callback(self, msg):
         """Handle incoming data and update current position in global map.
@@ -451,6 +449,7 @@ class Task(Node):
         data = msg.data
         self.get_logger().info(f"Position: {data}")
         self.global_position = [data[0], data[1]]
+        self.position_data_ready_event.set()
     
     def path_callback(self, msg):
         """Handle incoming data and update current waypoint list.
@@ -458,7 +457,8 @@ class Task(Node):
         Args:
             msg: Polygon of waypoints.
         """
-        self.get_logger().info(f"Path: {msg.data}")
+        # Polygon paths carry waypoints in points, not data.
+        self.get_logger().info(f"Path: {msg.points}")
         self.waypoints = [[p.y, p.x] for p in msg.points]
         self.path_data_ready_event.set()
 
