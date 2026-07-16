@@ -1,11 +1,12 @@
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray, Int8MultiArray
-from geometry_msgs.msg import Polygon
+from std_msgs.msg import Float32MultiArray
+from zed_msgs.msg import ObjectsStamped
+from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid
-import threading
 import numpy as np
 import math
+import threading
 
 class Mapping(Node):
     """ A ROS2 node that manages the mapping of the environment based on data from various sources.
@@ -17,14 +18,13 @@ class Mapping(Node):
         """ Initialize the Mapping node and set up publishers and subscribers. """
         super().__init__('Map_PubSub')
 
-        #Events
+        # Event used to block startup until the first phone update arrives.
         self.phone_data_ready_event = threading.Event()
         
         #Publishers and Subscribers
         self.global_pub = self.create_publisher(OccupancyGrid, 'global', 10)
-        self.current_position_pub = self.create_publisher(Float32MultiArray, 'position', 10)
-        self.objects_sub = self.create_subscription(Int8MultiArray, 'objects', self.object_callback, 10)
-        self.locations_sub = self.create_subscription(Polygon, 'locations', self.location_callback, 10)
+        self.current_position_pub = self.create_publisher(PoseStamped, 'position', 10)
+        self.objects_sub = self.create_subscription(ObjectsStamped, 'objects', self.object_callback, 10)
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
 
         # Declare parameters with fallback/default values
@@ -72,11 +72,13 @@ class Mapping(Node):
                 self.global_position = [round(self.global_rows*0.25), round(self.global_cols*0.25)]
 
         #Other variables from topics
-        self.objects = [-999]
-        self.locations = [[-999, -999]]
+        # Keep the ZED object list and the derived local positions separate so
+        # the map-building code can consume stable per-object coordinates.
+        self.objects = []
+        self.locations = []
         self.current_position = self.global_position
-        self.previous_position = [-999, -999]
-        self.heading = -999
+        self.previous_position = [np.nan, np.nan]
+        self.heading = np.nan
 
         # Spin until data is received
         self.get_logger().info('waiting for phone data...')
@@ -96,11 +98,28 @@ class Mapping(Node):
         self.get_logger().info(f"Map: {msg.data}")
 
     def publish_position(self) -> None:
-        """ Publish the current position as a Int8MultiArray message. """
-        msg = Int8MultiArray()
-        msg.data = self.global_position
+        """ Publish the current position as a PoseStamped message. """
+        # The position publisher is typed as PoseStamped, so publish the
+        # current coordinates in that matching message type.
+        # We only have heading, so we publish a yaw-only quaternion and assume
+        # roll and pitch are zero.
+        msg = PoseStamped()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = "map"
+        msg.pose.position.x = float(self.global_position[1])
+        msg.pose.position.y = float(self.global_position[0])
+        msg.pose.position.z = 0.0 # assumed
+        if np.isnan(self.heading):
+            # If heading is not yet available, fall back to the identity quaternion.
+            msg.pose.orientation.w = 1.0
+        else:
+            yaw = math.radians(self.heading)
+            msg.pose.orientation.x = 0.0
+            msg.pose.orientation.y = 0.0
+            msg.pose.orientation.z = math.sin(yaw / 2.0)
+            msg.pose.orientation.w = math.cos(yaw / 2.0)
         self.current_position_pub.publish(msg)
-        self.get_logger().info(f"Position: {msg.data}")
+        self.get_logger().info(f"Position: ({msg.pose.position.x}, {msg.pose.position.y})")
     
     #General Code
     def get_cell(self, meter: float) -> int: #convert units in meters to units in cells
@@ -161,12 +180,14 @@ class Mapping(Node):
         """ Update the local map based on detected obstacles and their locations. """
         self.local_map = np.zeros((self.local_rows, self.local_cols), dtype = np.int8)
 
-        for i in range(len(self.obstacles)):
-            obstacle = self.obstacles[i]
+        # Each ZED detection is approximated as a small occupied patch in the local grid.
+        for i, obstacle in enumerate(self.objects):
             location = self.locations[i]
 
             match obstacle: #Values rounded up to nearest whole cell length, assuming resolution of 0.5 m
                 case _:
+                    # ZED object detections do not guarantee a footprint here,
+                    # so we treat each object as a small occupied cell by default.
                     objL = 0.5
                     objW = 0.5
 
@@ -181,31 +202,24 @@ class Mapping(Node):
             # Write into the matrix
             for i in range(objL):
                 for j in range(objW):
-                    self.map[objStartY + j, objStartX + i] = 1
+                    self.local_map[objStartY + j, objStartX + i] = 1
         
-        if (self.current_position != -999) and (self.heading != -999):
+        if (self.current_position is not None and not np.isnan(self.current_position[0])) and (self.heading is not None and not np.isnan(self.heading)):
             self.get_global_map()
     
     #ROS - Subscribe
-    def object_callback(self, msg: Int8MultiArray) -> None:
+    def object_callback(self, msg: ObjectsStamped) -> None:
         """ 
         Callback function for the objects subscription. Updates the detected objects. 
         
         Args:
-            msg (Int8MultiArray): The message received from the objects topic, containing detected objects.
+            msg (ObjectsStamped): The ZED message received from the objects topic, containing detected objects.
         """
-        self.get_logger().info(f"Objects: {msg.data}")
-        self.objects = msg.data
-        self.get_local_map()
-    
-    def location_callback(self, msg: Polygon) -> None:
-        """Callback function for the locations subscription. Updates the list of detected objects' locations.
-        
-        Args:
-            msg (Polygon): The message received from the locations topic, containing detected objects' locations.
-        """
-        self.get_logger().info(f"Locations: {msg.data}")
-        self.locations = [[p.y, p.x] for p in msg.points]
+        # Store the full ZED detections and derive local map coordinates from
+        # each object's reported 3D position.
+        self.get_logger().info(f"Objects: {msg.objects}")
+        self.objects = msg.objects
+        self.locations = [[obj.position[1], obj.position[0]] for obj in self.objects]
         self.get_local_map()
 
     def phone_callback(self, msg: Float32MultiArray) -> None:
@@ -225,6 +239,7 @@ class Mapping(Node):
             self.current_position = [data[0], data[1]]
         self.heading = data[3]
         self.phone_data_ready_event.set() # Unblocks the init sequence
+
     
 def main(args = None):
     """ Main function to initialize the ROS2 node and start spinning. """
