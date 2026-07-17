@@ -292,11 +292,11 @@ class Motor(Node):
             )
             return
         
-        current_error = self.target_heading - self.current_heading
+        current_error = self.target_heading - self.convert(self.current_heading)
         dt = current_time - self.last_time
         de = (current_error - self.last_error) / dt
 
-        if current_error <= 45:
+        if abs(current_error) <= 45:
             self.i = self.i + self.ki * current_error
             if self.i < -self.max:
                 self.i = -self.max
@@ -345,6 +345,7 @@ class Motor(Node):
         else:
             self.dir = np.sign(current_error)
             self.turn_in_place()
+            self.get_logger().info("Turning in place")
     
     def check_data(self) -> None:
         """Executes action based on value of self.command"""
