@@ -47,3 +47,8 @@
     prop_max: 1880    # Propeller servo max pulse width (µs)
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
+
+    dw_min: 15        # Min voltage of Dewalt battery
+    dw_max: 21        # Max voltage of Dewalt battery
+    br_min: 13.2      # Min voltage of Blue Robotics battery
+    br_max: 16.8      # Max voltage of Blue Robotics battery

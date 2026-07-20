@@ -6,6 +6,7 @@ import numpy as np
 import time
 import busio
 import board
+from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
 
@@ -38,8 +39,10 @@ class Motor(Node):
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
         self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
         self.motor_pub = self.create_publisher(Float32MultiArray, 'motor', 10)
+        self.battery_pub = self.create_publisher(Float32MultiArray, 'battery', 10)
 
         # Declare parameters with fallback/default values
+        self.declare_parameter('timer_period', 0.25)
         self.declare_parameter('freq', 50)
         self.declare_parameter('factor', 0.75)
         self.declare_parameter('center', 0.55)
@@ -51,8 +54,13 @@ class Motor(Node):
         self.declare_parameter('prop_max', 1880)
         self.declare_parameter('rudder_min', 1220)
         self.declare_parameter('rudder_max', 1820)
+        self.declare_parameter('dw_min', 15)
+        self.declare_parameter('dw_max', 21)
+        self.declare_parameter('br_min', 13.2)
+        self.declare_parameter('br_max', 16.8)
 
         # Retrieve parameters
+        timer_period = self.get_parameter('timer_period').value
         freq       = self.get_parameter('freq').value
         self.factor = self.get_parameter('factor').value
         self.center = self.get_parameter('center').value
@@ -64,6 +72,10 @@ class Motor(Node):
         prop_max   = self.get_parameter('prop_max').value
         rudder_min = self.get_parameter('rudder_min').value
         rudder_max = self.get_parameter('rudder_max').value
+        self.dw_min = self.get_parameter('dw_min').value
+        self.dw_max = self.get_parameter('dw_max').value
+        self.br_min = self.get_parameter('br_min').value
+        self.br_max = self.get_parameter('br_max').value
 
         self._init_pca(freq)
         self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
@@ -86,6 +98,7 @@ class Motor(Node):
                    and self.task_data_ready_event.is_set()):
             rclpy.spin_once(self, timeout_sec = 0.1)
         self.get_logger().info('phone and task data received, starting motor control loop.')
+        self.timer = self.create_timer(timer_period, self.publish_battery)
 
     def _init_pca(self, freq) -> None:
         """Initialize the PCA9685 PWM driver over I2C.
@@ -114,11 +127,20 @@ class Motor(Node):
             raise
 
         try:
-            self.pca = PCA9685(i2c)
+            self.pca = PCA9685(i2c, address = 64)
         except Exception as e:
             self.get_logger().error(
                 f"PCA9685 not found on the I2C bus. Verify wiring, pull-up resistors, "
                 f"and the I2C address (default 0x40): {e}"
+            )
+            raise
+        
+        try:
+            self.ina = INA3221(i2c, address = 65, enable = [0, 1, 2])
+        except Exception as e:
+            self.get_logger().error(
+                f"INA3221 not found on the I2C bus. Verify wiring, pull-up resistors, "
+                f"and the I2C address (configured to 0x41): {e}"
             )
             raise
 
@@ -151,13 +173,47 @@ class Motor(Node):
                 f"hardware limits [{self.PULSE_MIN_LIMIT}, {self.PULSE_MAX_LIMIT}] µs."
             )
             raise ValueError(f"Pulse range out of hardware limits for {channel_name}")
-            
+
+    def convert(self, voltage, battery):
+        """Converts voltage into percentage of battery based on type.
+
+        Args:
+            voltage: Current voltage from battery.
+            battery: Battery type.
+
+        Returns: Percentage of battery life.
+        """
+        #Set min and max based on battery type
+        match battery:
+            case "dw":
+                min = self.dw_min
+                max = self.dw_max
+            case "br":
+                min = self.br_min
+                max = self.br_max
+        
+        #Calculate percentage
+        percentage = (voltage - min) / (max - min) * 100
+
+        return percentage
+
+    def publish_battery(self) -> None:
+        #Publish the current battery voltages, converted into percentages
+        battery_dwL = self.convert(self.ina[0].bus_voltage, "dw")
+        battery_dwR = self.convert(self.ina[1].bus_voltage, "dw")
+        battery_br = self.convert(self.ina[2].bus_voltage, "br")
+
+        msg = Float32MultiArray()
+        msg.data = [battery_dwL, battery_dwR, battery_br]
+        self.battery_pub.publish(msg)
+        self.get_logger().info(f"Battery: {msg.data}")
+        
     def publish_motor(self) -> None:
         # Publish the current motor state
         msg = Float32MultiArray()
         msg.data = [self.prop_l.fraction, self.prop_r.fraction, self.rudder.fraction]
         self.motor_pub.publish(msg)
-        #self.get_logger().info(f"Motor: {msg.data}")
+        self.get_logger().info(f"Motor: {msg.data}")
         
     def _init_servos(self, prop_min, prop_max, rudder_min, rudder_max) -> None:
         """Set up servo PWM channels on the PCA9685 with validated pulse ranges.
@@ -272,14 +328,6 @@ class Motor(Node):
         
         self.publish_motor()
 
-    @staticmethod
-    def _is_valid_numeric_value(value) -> bool:
-        """Return True for numeric values that are not NaN."""
-        try:
-            return not np.isnan(value)
-        except (TypeError, ValueError):
-            return False
-
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()
@@ -360,7 +408,7 @@ class Motor(Node):
                 self.drive()
             
             case 2: #turn
-                if self._is_valid_numeric_value(self.dir):
+                if self.dir != -999:
                     self.turn_in_place()
 
     def phone_callback(self, msg) -> None:  
@@ -398,7 +446,6 @@ class Motor(Node):
         """De-initialize the PCA9685 and release the I2C bus on node shutdown."""
         self.pca.deinit()
 
-
 def main(args=None) -> None:
     """ Main function to initialize the ROS2 node and start spinning. """
     rclpy.init(args=args)
@@ -413,7 +460,6 @@ def main(args=None) -> None:
         motor.shutdown()
         motor.destroy_node()
         rclpy.shutdown()
-
 
 if __name__ == '__main__':
     main()
