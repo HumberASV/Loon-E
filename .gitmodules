@@ -1,0 +1,3 @@
+[submodule "src/LoonE-URDF"]
+	path = src/LoonE-URDF
+	url = https://github.com/HumberASV/LoonE-URDF.git
