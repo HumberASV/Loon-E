@@ -92,12 +92,12 @@ class Motor(Node):
         self.target_speed = np.nan
         self.dir = np.nan
 
-        # Spin until data is received
+        '''# Spin until data is received
         self.get_logger().info('waiting for phone and task data...')
         while not (self.phone_data_ready_event.is_set()
                    and self.task_data_ready_event.is_set()):
             rclpy.spin_once(self, timeout_sec = 0.1)
-        self.get_logger().info('phone and task data received, starting motor control loop.')
+        self.get_logger().info('phone and task data received, starting motor control loop.')'''
         self.timer = self.create_timer(timer_period, self.publish_battery)
 
     def _init_pca(self, freq) -> None:
@@ -174,7 +174,7 @@ class Motor(Node):
             )
             raise ValueError(f"Pulse range out of hardware limits for {channel_name}")
 
-    def convert(self, voltage, battery):
+    def convert_battery(self, voltage: float, battery: str) -> float:
         """Converts voltage into percentage of battery based on type.
 
         Args:
@@ -199,9 +199,9 @@ class Motor(Node):
 
     def publish_battery(self) -> None:
         #Publish the current battery voltages, converted into percentages
-        battery_dwL = self.convert(self.ina[0].bus_voltage, "dw")
-        battery_dwR = self.convert(self.ina[1].bus_voltage, "dw")
-        battery_br = self.convert(self.ina[2].bus_voltage, "br")
+        battery_dwL = self.convert_battery(self.ina[0].bus_voltage, "dw")
+        battery_dwR = self.convert_battery(self.ina[1].bus_voltage, "dw")
+        battery_br = self.convert_battery(self.ina[2].bus_voltage, "br")
 
         msg = Float32MultiArray()
         msg.data = [battery_dwL, battery_dwR, battery_br]
