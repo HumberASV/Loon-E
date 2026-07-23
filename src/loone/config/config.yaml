@@ -1,6 +1,8 @@
 # Configurations
 /task:
   ros_parameters:
+    local_l: 20
+    res: 0.5
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
@@ -34,6 +36,7 @@
 
 /motor:
   ros_parameters:
+    timer_period: 0.25 # Timer period in seconds
     freq: 50          # PCA9685 PWM frequency in Hz
     factor: 0.75      # Initial propeller throttle factor
     center: 0.55      # Rudder center fraction (0 degrees)
