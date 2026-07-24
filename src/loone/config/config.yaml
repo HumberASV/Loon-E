@@ -1,6 +1,8 @@
 # Configurations
 /task:
   ros_parameters:
+    local_l: 20
+    res: 0.5
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
@@ -35,6 +37,7 @@
 
 /motor:
   ros_parameters:
+    timer_period: 0.25 # Timer period in seconds
     freq: 50          # PCA9685 PWM frequency in Hz
     factor: 0.75      # Initial propeller throttle factor
     center: 0.55      # Rudder center fraction (0 degrees)
@@ -48,3 +51,8 @@
     prop_max: 1880    # Propeller servo max pulse width (µs)
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
+
+    dw_min: 15        # Min voltage of Dewalt battery
+    dw_max: 21        # Max voltage of Dewalt battery
+    br_min: 13.2      # Min voltage of Blue Robotics battery
+    br_max: 16.8      # Max voltage of Blue Robotics battery

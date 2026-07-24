@@ -40,7 +40,7 @@
   <exec_depend>subprocess</exec_depend>
   <exec_depend>busio</exec_depend>
   <exec_depend>board</exec_depend>
-  <exec_depend>adafruit_pca9685</exec_depend>
+  <exec_depend>adafruit_ina3221</exec_depend>
   <exec_depend>adafruit_motor</exec_depend>
   <exec_depend>turtlebot3_bringup</exec_depend>
   <exec_depend>turtlebot3_navigation2</exec_depend>
