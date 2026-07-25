@@ -148,14 +148,20 @@ class BusioNode(Node):
             self.get_logger().error(f"PCA9685 not found on I2C bus (check wiring/address 0x40): {e}")
             raise
 
+        self.pca.frequency = freq
+        self.get_logger().info(f"PCA9685 initialized at {freq} Hz.")
+
+        # INA3221 (battery voltage monitor) is a separate chip from the PCA9685 that
+        # drives the propellers/rudder. A wiring fault on this sensor must not take
+        # the motors down with it, so its failure is logged but not fatal here --
+        # publish_battery_raw() skips publishing while self.ina is None.
         try:
             self.ina = INA3221(i2c, address = 65, enable = [0, 1, 2])
         except Exception as e:
-            self.get_logger().error(f"INA3221 not found on I2C bus (check wiring/address 0x41): {e}")
-            raise
-        
-        self.pca.frequency = freq
-        self.get_logger().info(f"PCA9685 initialized at {freq} Hz.")
+            self.get_logger().error(
+                f"INA3221 not found on I2C bus (check wiring/address 0x41): {e}. "
+                "Battery telemetry disabled; motors are unaffected.")
+            self.ina = None
 
     def _validate_pulse_range(self, min_pulse, max_pulse, channel_name) -> None:
         """Validate PWM pulse widths are ordered and within hardware limits (ported from motor.py)."""
@@ -240,7 +246,11 @@ class BusioNode(Node):
 
         battery_node.py subscribes to this and turns it into proper
         sensor_msgs/BatteryState messages (percentage, health, per-battery topics).
+
+        No-op if the INA3221 failed to initialize (see _init_busio).
         """
+        if self.ina is None:
+            return
         msg = Float32MultiArray()
         msg.data = [
             self.ina[0].bus_voltage,

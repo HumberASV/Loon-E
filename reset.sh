@@ -15,6 +15,10 @@ echo "clearing cache"
 sudo rm -rf /tmp/argus_socket
 echo "cache cleared"
 sleep 1
+echo "clearing ipc shared memory"
+sudo ipcrm -a
+echo "done".
+sleep 1
 echo "starting service nvargus"
 sudo systemctl start nvargus-daemon.service
 sleep 5

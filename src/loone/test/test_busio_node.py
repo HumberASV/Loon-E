@@ -127,6 +127,45 @@ class TestInitValidation:
     def test_validate_pulse_range_valid_does_not_raise(self, busio_node):
         busio_node._validate_pulse_range(1120, 1880, 'prop')
 
+    def test_init_busio_ina_failure_is_non_fatal(self):
+        # A wiring fault on the INA3221 (battery monitor) must not prevent the
+        # PCA9685 (propeller/rudder driver) from being set up.
+        with patch('loone.busio_node.busio'), \
+             patch('loone.busio_node.board'), \
+             patch('loone.busio_node.PCA9685') as pca_mock, \
+             patch('loone.busio_node.INA3221', side_effect=ValueError('No I2C device at address: 0x41')), \
+             patch('loone.busio_node.servo'):
+
+            pca_instance = MagicMock()
+            pca_mock.return_value = pca_instance
+
+            from loone.busio_node import BusioNode
+
+            node = BusioNode.__new__(BusioNode)
+            node.get_logger = MagicMock(return_value=MagicMock())
+
+            node._init_busio(50)
+
+            assert node.pca is pca_instance
+            assert node.ina is None
+
+    def test_init_busio_pca_failure_still_raises(self):
+        # Unlike the INA3221, the PCA9685 is required to drive the motors at all,
+        # so its failure must still be fatal.
+        with patch('loone.busio_node.busio'), \
+             patch('loone.busio_node.board'), \
+             patch('loone.busio_node.PCA9685', side_effect=ValueError('No I2C device at address: 0x40')), \
+             patch('loone.busio_node.INA3221'), \
+             patch('loone.busio_node.servo'):
+
+            from loone.busio_node import BusioNode
+
+            node = BusioNode.__new__(BusioNode)
+            node.get_logger = MagicMock(return_value=MagicMock())
+
+            with pytest.raises(ValueError):
+                node._init_busio(50)
+
     def test_init_servos_propagates_validation_failure(self):
         with patch('loone.busio_node.servo'):
             from loone.busio_node import BusioNode
@@ -257,6 +296,16 @@ class TestPublishBatteryRaw:
         # Float32MultiArray.data is a float32 array.array, not a list -- convert
         # before comparing, and use approx for the float32 rounding.
         assert list(msg.data) == pytest.approx([11.1, 12.2, 13.3])
+
+    def test_skips_publishing_when_ina_unavailable(self, busio_node):
+        # self.ina is None when the INA3221 failed to initialize (see
+        # test_init_busio_ina_failure_is_non_fatal) -- publishing must no-op
+        # rather than crash on `self.ina[0]`.
+        busio_node.ina = None
+
+        busio_node.publish_battery_raw()
+
+        busio_node.battery_raw_pub.publish.assert_not_called()
 
 
 # ── Shutdown tests ──────────────────────────────────────────────────────────────
