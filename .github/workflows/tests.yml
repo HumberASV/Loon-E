@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  test-motor:
+  test-loone:
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
@@ -27,7 +27,7 @@ jobs:
         run: |
           source /opt/ros/humble/setup.bash
           python3 -m pip install --upgrade pip
-          python3 -m pip install pytest numpy adafruit-circuitpython-motor adafruit-circuitpython-pca9685
+          python3 -m pip install pytest numpy adafruit-circuitpython-motor adafruit-circuitpython-pca9685 adafruit-circuitpython-ina3221
 
       - name: Install ROS package dependencies
         run: |
@@ -40,8 +40,8 @@ jobs:
             ros-humble-turtlebot3-navigation2 \
             ros-humble-zed-msgs
 
-      - name: Run motor unit tests
+      - name: Run loone unit tests
         run: |
           source /opt/ros/humble/setup.bash
           export PYTHONPATH="$PYTHONPATH:$GITHUB_WORKSPACE/src/loone:$GITHUB_WORKSPACE/src/loone/test/stubs"
-          python3 -m pytest src/loone/test/test_motor.py -v
+          python3 -m pytest src/loone/test/test_phone.py src/loone/test/test_busio_node.py src/loone/test/test_battery_node.py src/loone/test/test_thrust_mixer.py -v
