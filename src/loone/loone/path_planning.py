@@ -1,3 +1,6 @@
+"""
+Deprecated: replaced by Navigation2 and SLAM Toolbox. This file is retained for reference and historical purposes.
+"""
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Polygon, Point32

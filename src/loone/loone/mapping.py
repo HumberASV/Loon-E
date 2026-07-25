@@ -1,3 +1,6 @@
+"""
+Deprecated: replaced by Zedx and SLAM Toolbox. This file is retained for reference and historical purposes.
+"""
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import Float32MultiArray
