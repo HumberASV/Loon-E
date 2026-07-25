@@ -16,3 +16,6 @@ log/
 
 rviz-plugin-zed-od/
 zed_display_rviz2/
+
+# Dmessges
+*.log
