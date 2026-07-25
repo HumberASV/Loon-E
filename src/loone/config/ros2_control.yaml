@@ -10,7 +10,7 @@
 #
 # The thrust_mixer node publishes to /asv_forward_controller/commands; the hardware
 # side (topic_based_ros2_control) then relays the command interfaces to the
-# pca9685_driver node. See loone_asv.urdf.xacro for the interface declarations.
+# busio_node node. See loone_asv.urdf.xacro for the interface declarations.
 
 controller_manager:
   ros__parameters:

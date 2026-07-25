@@ -5,9 +5,9 @@ topic_based_ros2_control needs BOTH halves of its topic pair:
     * it PUBLISHES command-interface values on /asv/joint_commands
     * it SUBSCRIBES /asv/joint_states to fill its state interfaces
 
-On the real boat, pca9685_driver.py provides that second half -- it echoes the
+On the real boat, busio_node.py provides that second half -- it echoes the
 commands it just wrote to the servos (see its `publish_state`). In simulation
-pca9685_driver is not running (no I2C bus), so nothing publishes /asv/joint_states,
+busio_node is not running (no I2C bus), so nothing publishes /asv/joint_states,
 the state interfaces stay NaN, joint_state_broadcaster publishes NaN, and
 robot_state_publisher floods the log with TF errors.
 
@@ -15,7 +15,7 @@ This node fills that gap and NOTHING else: commands in, same values back out as
 state. It is deliberately the same open-loop echo the real driver does, so the
 sim and hardware topic graphs are identical -- the only thing that changes
 between them is which node subscribes /asv/joint_commands
-(pca9685_driver.py on the boat, ros2_bridge.py inside Isaac Sim).
+(busio_node.py on the boat, ros2_bridge.py inside Isaac Sim).
 
 If you later want true feedback in sim (real rudder angle from the physics
 articulation rather than the commanded value), publish /asv/joint_states from
@@ -36,7 +36,7 @@ from sensor_msgs.msg import JointState
 # interface at NaN, so always echo all three.
 JOINTS = ['prop_l_joint', 'prop_r_joint', 'rudder_joint']
 
-# Neutral fractions, matching thrust_mixer.py / pca9685_driver.py defaults. These
+# Neutral fractions, matching thrust_mixer.py / busio_node.py defaults. These
 # seed the state before the first command arrives so ros2_control never sees NaN.
 NEUTRAL = {
     'prop_l_joint': 0.5,

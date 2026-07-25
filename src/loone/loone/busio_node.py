@@ -1,7 +1,7 @@
-"""PCA9685 driver: JointState commands -> servo PWM over I2C.
+"""busio_node: JointState commands -> servo PWM over I2C (formerly pca9685_driver.py).
 
 This node is the bottom of the chained-controls stack. It is the ONLY node that
-touches the I2C bus / PCA9685 hardware:
+touches the I2C bus / PCA9685 / INA3221 hardware:
 
     ros2_control (topic_based_ros2_control / TopicBasedSystem)
         --> /asv/joint_commands (sensor_msgs/JointState)  [command interface values]
@@ -21,13 +21,18 @@ Incoming values are normalized servo fractions in [0, 1] (see thrust_mixer.py):
 Because the ros2_control command interface is declared as "position" in the URDF,
 the fractions arrive in JointState.position. (If you switch the URDF interface to
 "velocity", read msg.velocity instead -- see JOINT_COMMAND_FIELD below.)
+
+This node also owns the INA3221 (same I2C bus, address 0x41, channels 0/1/2 wired
+to the dwL/dwR/br batteries -- see config.yaml's dw_min/dw_max/br_min/br_max). It
+only publishes the raw bus voltages on 'battery_raw'; battery_node.py subscribes
+to that and converts it into proper sensor_msgs/BatteryState messages.
 """
 
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
-from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import JointState
+from std_msgs.msg import Float32MultiArray
 import busio
 import board
 from adafruit_ina3221 import INA3221
@@ -35,7 +40,7 @@ from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
 
 
-class Pca9685Driver(Node):
+class BusioNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
 
     # Valid frequency range for PCA9685 (Hz) -- copied from motor.py.
@@ -51,10 +56,10 @@ class Pca9685Driver(Node):
     JOINT_COMMAND_FIELD = 'position'
 
     def __init__(self) -> None:
-        super().__init__('pca9685_driver')
+        super().__init__('busio_node')
 
         # ---- Parameters (defaults mirror config.yaml /motor block and motor.py) ----
-        self.declare_parameter('timer_period', 0.25) # Timer period to publish battery data
+        self.declare_parameter('timer_period', 0.25) # Timer period to publish raw battery voltages
         self.declare_parameter('freq', 50)          # PCA9685 PWM frequency (Hz)
         self.declare_parameter('prop_min', 1120)    # propeller servo min pulse (us)
         self.declare_parameter('prop_max', 1880)    # propeller servo max pulse (us)
@@ -103,7 +108,8 @@ class Pca9685Driver(Node):
         self.cmd_sub = self.create_subscription(
             JointState, '/asv/joint_commands', self.command_callback, qos_profile_sensor_data)
         self.state_pub = self.create_publisher(JointState, '/asv/joint_states', 10)
-        self.battery_pub = self.create_publisher(Float32MultiArray, 'battery', 10)
+        # Raw INA3221 bus voltages for battery_node to convert into BatteryState messages.
+        self.battery_raw_pub = self.create_publisher(Float32MultiArray, 'battery_raw', 10)
 
         # Start every channel at its neutral so the boat does not lurch on boot.
         self._apply(dict(self.joint_neutral))
@@ -111,9 +117,9 @@ class Pca9685Driver(Node):
         self.last_cmd_time = self.get_clock().now()
         # Watchdog: periodically check for stale commands and re-publish state.
         self.timer = self.create_timer(0.1, self.watchdog)
-        self.timer = self.create_timer(timer_period, self.publish_battery)
+        self.battery_timer = self.create_timer(timer_period, self.publish_battery_raw)
 
-        self.get_logger().info('pca9685_driver ready, channels at neutral.')
+        self.get_logger().info('busio_node ready, channels at neutral.')
 
     # ------------------------------------------------------------------ hardware setup
     def _init_busio(self, freq) -> None:
@@ -223,15 +229,19 @@ class Pca9685Driver(Node):
         msg.position = [applied[name] for name in msg.name]
         self.state_pub.publish(msg)
 
-    def publish_battery(self) -> None:
-        #Publish the current battery voltages
-        battery_dwL = self.ina[0].bus_voltage
-        battery_dwR = self.ina[1].bus_voltage
-        battery_br = self.ina[2].bus_voltage
+    def publish_battery_raw(self) -> None:
+        """Publish the three INA3221 bus voltages [dwL, dwR, br], unconverted.
 
+        battery_node.py subscribes to this and turns it into proper
+        sensor_msgs/BatteryState messages (percentage, health, per-battery topics).
+        """
         msg = Float32MultiArray()
-        msg.data = [battery_dwL, battery_dwR, battery_br]
-        self.battery_pub.publish(msg)
+        msg.data = [
+            self.ina[0].bus_voltage,
+            self.ina[1].bus_voltage,
+            self.ina[2].bus_voltage,
+        ]
+        self.battery_raw_pub.publish(msg)
 
     def shutdown(self) -> None:
         """Return channels to neutral and release the PCA9685 on node shutdown."""
@@ -244,13 +254,13 @@ class Pca9685Driver(Node):
 def main(args=None) -> None:
     """Initialize the ROS2 node and spin."""
     rclpy.init(args=args)
-    node = Pca9685Driver()
+    node = BusioNode()
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('pca9685_driver interrupted by user.')
+        node.get_logger().info('busio_node interrupted by user.')
     except Exception as e:
-        node.get_logger().error(f'pca9685_driver error: {e}')
+        node.get_logger().error(f'busio_node error: {e}')
     finally:
         node.shutdown()
         node.destroy_node()

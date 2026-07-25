@@ -95,19 +95,19 @@
   <!--
     Stock topic_based_ros2_control hardware: it bridges the command/state interfaces
     below to plain ROS topics instead of a real driver, so we can keep the actual
-    PCA9685 access in the Python pca9685_driver node (no C++).
+    PCA9685 access in the Python busio_node node (no C++).
 
     Data flow:
       * TopicBasedSystem PUBLISHES the command-interface values as sensor_msgs/JointState
-        on `joint_commands_topic`  -> pca9685_driver subscribes and writes I2C.
+        on `joint_commands_topic`  -> busio_node subscribes and writes I2C.
       * TopicBasedSystem SUBSCRIBES `joint_states_topic` for the state-interface values
-        <- pca9685_driver publishes an (open-loop) echo.
+        <- busio_node publishes an (open-loop) echo.
 
     Interface choice: we use "position" for all three joints because a PCA9685 servo
     fraction is a position-like [0,1] command, and one ForwardCommandController can
     only drive ONE interface type. The value is a normalized fraction, not radians.
     If you prefer velocity semantics for the thrusters, change name="position" to
-    name="velocity" here AND set JOINT_COMMAND_FIELD='velocity' in pca9685_driver.py
+    name="velocity" here AND set JOINT_COMMAND_FIELD='velocity' in busio_node.py
     AND interface_name in ros2_control.yaml.
   -->
   <ros2_control name="asv" type="system">

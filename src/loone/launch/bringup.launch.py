@@ -10,10 +10,12 @@ Starts, in order:
   4. controller_manager     - ros2_control node hosting the hardware + controllers.
   5. spawners               - joint_state_broadcaster + asv_forward_controller.
   6. thrust_mixer           - /cmd_vel -> /asv_forward_controller/commands.
-  7. pca9685_driver         - /asv/joint_commands -> PCA9685 over I2C.
-  8. phone                  - phone GPS (ADB) -> /navsatfix, fused into the ZED's
+  7. busio_node             - /asv/joint_commands -> PCA9685 over I2C; also publishes
+                              raw INA3221 battery voltages on battery_raw.
+  8. battery_node           - battery_raw -> proper sensor_msgs/BatteryState topics.
+  9. phone                  - phone GPS (ADB) -> /navsatfix, fused into the ZED's
                               pos_tracking via gnss_fusion (config/common_stereo.yaml).
-  9. navigation_launch.py   - nav2 planner/controller/costmaps -> /cmd_vel.
+ 10. navigation_launch.py   - nav2 planner/controller/costmaps -> /cmd_vel.
 
 The old task/motor/path_planning nodes are intentionally NOT started here.
 Send goals with RViz "2D Goal Pose" or a NavigateToPose action client.
@@ -125,13 +127,13 @@ def generate_launch_description():
         parameters=[{'use_sim_time': use_sim_time}],
     )
 
-    # 7. Hardware driver (fractions -> PCA9685). Only node touching I2C.
+    # 7. Hardware driver (fractions -> PCA9685; also reads the INA3221). Only node touching I2C.
     #    Excluded in sim: it imports board/busio at module scope, so it cannot even
     #    start on a machine without an I2C bus.
-    pca9685_driver = Node(
+    busio_node = Node(
         package='loone',
-        executable='pca9685_driver',
-        name='pca9685_driver',
+        executable='busio_node',
+        name='busio_node',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         condition=UnlessCondition(sim),
@@ -150,7 +152,18 @@ def generate_launch_description():
         condition=IfCondition(sim),
     )
 
-    # 8. Phone GPS bridge: publishes NavSatFix on /navsatfix, which the ZED wrapper's
+    # 8. Battery telemetry (battery_raw -> sensor_msgs/BatteryState). Depends on
+    #    busio_node's INA3221 readings, so it is excluded in sim for the same reason.
+    battery_node = Node(
+        package='loone',
+        executable='battery_node',
+        name='battery_node',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        condition=UnlessCondition(sim),
+    )
+
+    # 9. Phone GPS bridge: publishes NavSatFix on /navsatfix, which the ZED wrapper's
     #    gnss_fusion (config/common_stereo.yaml) subscribes to and fuses into pos_tracking.
     phone = Node(
         package='loone',
@@ -159,7 +172,7 @@ def generate_launch_description():
         output='screen',
     )
 
-    # 9. nav2 (produces /cmd_vel). No AMCL/map_server -- SLAM Toolbox owns those.
+    # 10. nav2 (produces /cmd_vel). No AMCL/map_server -- SLAM Toolbox owns those.
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             os.path.join(nav2_bringup_share, 'launch', 'navigation_launch.py')),
@@ -180,7 +193,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='false',
                               description='Use /clock simulated time. Keep false on the real boat.'),
         DeclareLaunchArgument('sim', default_value='false',
-                              description='Simulation mode: swap pca9685_driver for sim_state_echo '
+                              description='Simulation mode: swap busio_node for sim_state_echo '
                                           '(Isaac Sim drives the actuators). Usually set together '
                                           'with use_sim_time:=true.'),
         slam_launch,
@@ -190,8 +203,9 @@ def generate_launch_description():
         joint_state_broadcaster_spawner,
         asv_forward_controller_spawner,
         thrust_mixer,
-        pca9685_driver,
+        busio_node,
         sim_state_echo,
+        battery_node,
         phone,
         nav2_launch,
     ])

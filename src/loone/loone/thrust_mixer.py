@@ -18,7 +18,7 @@ Why a Python node instead of a C++ ros2_control controller?
 Output convention (matches the old motor.py servo fractions):
     * propellers: 0.0 = full reverse, 0.5 = neutral/stop, 1.0 = full forward
     * rudder:     0.0 = full one way, `center` (~0.55) = straight, 1.0 = full other way
-    The pca9685_driver node converts these fractions to PCA9685 pulse widths.
+    The busio_node node converts these fractions to PCA9685 pulse widths.
 """
 
 import rclpy
