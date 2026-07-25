@@ -26,9 +26,11 @@ the fractions arrive in JointState.position. (If you switch the URDF interface t
 import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
+from std_msgs.msg import Float32MultiArray
 from sensor_msgs.msg import JointState
 import busio
 import board
+from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
 
@@ -52,6 +54,7 @@ class Pca9685Driver(Node):
         super().__init__('pca9685_driver')
 
         # ---- Parameters (defaults mirror config.yaml /motor block and motor.py) ----
+        self.declare_parameter('timer_period', 0.25) # Timer period to publish battery data
         self.declare_parameter('freq', 50)          # PCA9685 PWM frequency (Hz)
         self.declare_parameter('prop_min', 1120)    # propeller servo min pulse (us)
         self.declare_parameter('prop_max', 1880)    # propeller servo max pulse (us)
@@ -62,6 +65,7 @@ class Pca9685Driver(Node):
         # Dead-man: if no command arrives within this many seconds, go neutral.
         self.declare_parameter('cmd_timeout', 0.5)
 
+        timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
         prop_min = self.get_parameter('prop_min').value
         prop_max = self.get_parameter('prop_max').value
@@ -72,7 +76,7 @@ class Pca9685Driver(Node):
         self.cmd_timeout = self.get_parameter('cmd_timeout').value
 
         # ---- Hardware bring-up (same sequence as motor.py) ----
-        self._init_pca(freq)
+        self._init_busio(freq)
         self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
 
         # Map ros2_control joint names -> the servo object on each PCA9685 channel.
@@ -99,6 +103,7 @@ class Pca9685Driver(Node):
         self.cmd_sub = self.create_subscription(
             JointState, '/asv/joint_commands', self.command_callback, qos_profile_sensor_data)
         self.state_pub = self.create_publisher(JointState, '/asv/joint_states', 10)
+        self.battery_pub = self.create_publisher(Float32MultiArray, 'battery', 10)
 
         # Start every channel at its neutral so the boat does not lurch on boot.
         self._apply(dict(self.joint_neutral))
@@ -106,11 +111,12 @@ class Pca9685Driver(Node):
         self.last_cmd_time = self.get_clock().now()
         # Watchdog: periodically check for stale commands and re-publish state.
         self.timer = self.create_timer(0.1, self.watchdog)
+        self.timer = self.create_timer(timer_period, self.publish_battery)
 
         self.get_logger().info('pca9685_driver ready, channels at neutral.')
 
     # ------------------------------------------------------------------ hardware setup
-    def _init_pca(self, freq) -> None:
+    def _init_busio(self, freq) -> None:
         """Initialize the PCA9685 PWM driver over I2C (ported from motor.py)."""
         if not (self.PCA_FREQ_MIN <= freq <= self.PCA_FREQ_MAX):
             self.get_logger().error(
@@ -125,11 +131,17 @@ class Pca9685Driver(Node):
             raise
 
         try:
-            self.pca = PCA9685(i2c)
+            self.pca = PCA9685(i2c, address = 64)
         except Exception as e:
-            self.get_logger().error(f"PCA9685 not found on I2C bus (check wiring/address): {e}")
+            self.get_logger().error(f"PCA9685 not found on I2C bus (check wiring/address 0x40): {e}")
             raise
 
+        try:
+            self.ina = INA3221(i2c, address = 65, enable = [0, 1, 2])
+        except Exception as e:
+            self.get_logger().error(f"INA3221 not found on I2C bus (check wiring/address 0x41): {e}")
+            raise
+        
         self.pca.frequency = freq
         self.get_logger().info(f"PCA9685 initialized at {freq} Hz.")
 
@@ -210,6 +222,16 @@ class Pca9685Driver(Node):
         # commanded fraction. There is no real feedback sensor -- this is an honest echo.
         msg.position = [applied[name] for name in msg.name]
         self.state_pub.publish(msg)
+
+    def publish_battery(self) -> None:
+        #Publish the current battery voltages
+        battery_dwL = self.ina[0].bus_voltage
+        battery_dwR = self.ina[1].bus_voltage
+        battery_br = self.ina[2].bus_voltage
+
+        msg = Float32MultiArray()
+        msg.data = [battery_dwL, battery_dwR, battery_br]
+        self.battery_pub.publish(msg)
 
     def shutdown(self) -> None:
         """Return channels to neutral and release the PCA9685 on node shutdown."""
