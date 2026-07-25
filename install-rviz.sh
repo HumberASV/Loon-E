@@ -17,7 +17,7 @@ REPO_REF="v5.4.0"
 PACKAGES=(rviz-plugin-zed-od zed_display_rviz2)
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WS_ROOT="$SCRIPT_DIR/Loon-E"
+WS_ROOT="$SCRIPT_DIR"
 SRC_DIR="$WS_ROOT/src"
 
 ACTION="${1:-install}"
