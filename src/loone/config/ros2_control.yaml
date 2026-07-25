@@ -5,12 +5,19 @@
 #   * joint_state_broadcaster  - reads the state interfaces and publishes /joint_states
 #     (this is what robot_state_publisher uses to place the prop/rudder links in TF).
 #   * asv_forward_controller   - a stock ForwardCommandController that forwards the
-#     [prop_l, prop_r, rudder] fractions it receives on
+#     [propeller_l, propeller_r, rudder_l, rudder_r] fractions it receives on
 #     /asv_forward_controller/commands straight to the "position" command interfaces.
 #
 # The thrust_mixer node publishes to /asv_forward_controller/commands; the hardware
 # side (topic_based_ros2_control) then relays the command interfaces to the
-# busio_node node. See loone_asv.urdf.xacro for the interface declarations.
+# busio_node node. See le1000_urdf_t4/urdf/le1000_urdf_t4.urdf.xacro (src/loone_urdf)
+# for the interface declarations.
+#
+# NOTE: the URDF models two independent rudder joints (one per float, twin-float
+# catamaran), but the boat has only ONE physical rudder servo. thrust_mixer
+# publishes the same rudder fraction into both rudder_l_joint/rudder_r_joint
+# slots, and busio_node.py's joint_to_servo maps both names onto that one servo
+# object -- they always move together.
 
 controller_manager:
   ros__parameters:
@@ -26,12 +33,14 @@ controller_manager:
       type: forward_command_controller/ForwardCommandController
 
 # ForwardCommandController: the `joints` order here defines the order of the
-# Float64MultiArray that thrust_mixer must publish -> [prop_l, prop_r, rudder].
+# Float64MultiArray that thrust_mixer must publish ->
+# [propeller_l, propeller_r, rudder_l, rudder_r] (rudder_l == rudder_r).
 asv_forward_controller:
   ros__parameters:
     joints:
-      - prop_l_joint
-      - prop_r_joint
-      - rudder_joint
-    # Must match the command_interface name in loone_asv.urdf.xacro.
+      - propeller_l_joint
+      - propeller_r_joint
+      - rudder_l_joint
+      - rudder_r_joint
+    # Must match the command_interface name in le1000_urdf_t4.urdf.xacro.
     interface_name: position

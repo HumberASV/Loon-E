@@ -6,7 +6,7 @@
 #   * amcl / map_server  -> SLAM Toolbox already provides the map and map->odom TF.
 #   * robot_state_publisher / controllers -> see bringup.launch.py + ros2_control.yaml.
 #
-# Frames assumed (see loone_asv.urdf.xacro): global map frame = "map", odom frame =
+# Frames assumed (see le1000_urdf_t4.urdf.xacro, src/loone_urdf): global map frame = "map", odom frame =
 # "odom", robot base = "base_link". Obstacles come from the "/scan" LaserScan that
 # depth_to_laserscan synthesizes from the ZED depth image.
 #

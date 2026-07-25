@@ -1,3 +1,6 @@
 [submodule "src/zedx"]
 	path = src/zedx
 	url = https://github.com/HumberASV/zed-ros2-wrapper
+[submodule "src/loone_urdf"]
+	path = src/loone_urdf
+	url = https://github.com/HumberASV/LoonE-URDF

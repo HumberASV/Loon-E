@@ -31,6 +31,8 @@
   <exec_depend>robot_state_publisher</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <!-- Robot description (src/loone_urdf submodule) -->
+  <exec_depend>le1000_urdf_t4</exec_depend>
   <exec_depend>nav2_regulated_pure_pursuit_controller</exec_depend>
   <exec_depend>threading</exec_depend>
   <exec_depend>numpy</exec_depend>

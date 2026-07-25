@@ -52,52 +52,59 @@ class TestClamp:
 # ── mix() tests ─────────────────────────────────────────────────────────────────
 
 class TestMix:
-    """mix() maps a Twist to [prop_l, prop_r, rudder] fractions using the
-    node's (default) surge/yaw/rudder gains and safety limits."""
+    """mix() maps a Twist to [prop_l, prop_r, rudder_l, rudder_r] fractions
+    using the node's (default) surge/yaw/rudder gains and safety limits.
+    rudder_l/rudder_r are always equal -- there is only one physical rudder
+    servo behind the URDF's two rudder joints (see module docstring)."""
 
-    def test_zero_cmd_returns_neutral_triple(self, mixer_node):
+    def test_zero_cmd_returns_neutral_quad(self, mixer_node):
         result = mixer_node.mix(Twist())
-        assert result == [mixer_node.prop_neutral, mixer_node.prop_neutral, mixer_node.rudder_center]
+        assert result == [
+            mixer_node.prop_neutral, mixer_node.prop_neutral,
+            mixer_node.rudder_center, mixer_node.rudder_center,
+        ]
 
     def test_positive_surge_raises_both_props_equally(self, mixer_node):
         cmd = Twist()
         cmd.linear.x = 0.2  # no yaw -> symmetric throttle bump, rudder stays centered
-        prop_l, prop_r, rudder = mixer_node.mix(cmd)
+        prop_l, prop_r, rudder_l, rudder_r = mixer_node.mix(cmd)
         assert prop_l == prop_r > mixer_node.prop_neutral
-        assert rudder == mixer_node.rudder_center
+        assert rudder_l == rudder_r == mixer_node.rudder_center
 
     def test_positive_yaw_biases_left_prop_higher_and_rudder_off_center(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = 0.5
-        prop_l, prop_r, rudder = mixer_node.mix(cmd)
+        prop_l, prop_r, rudder_l, rudder_r = mixer_node.mix(cmd)
         assert prop_l > prop_r
-        assert rudder > mixer_node.rudder_center
+        assert rudder_l == rudder_r > mixer_node.rudder_center
 
     def test_negative_yaw_biases_right_prop_higher_and_rudder_other_way(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = -0.5
-        prop_l, prop_r, rudder = mixer_node.mix(cmd)
+        prop_l, prop_r, rudder_l, rudder_r = mixer_node.mix(cmd)
         assert prop_r > prop_l
-        assert rudder < mixer_node.rudder_center
+        assert rudder_l == rudder_r < mixer_node.rudder_center
 
     def test_large_surge_saturates_props_at_prop_limit(self, mixer_node):
         cmd = Twist()
         cmd.linear.x = 100.0
-        prop_l, prop_r, _ = mixer_node.mix(cmd)
+        prop_l, prop_r, _, _ = mixer_node.mix(cmd)
         assert prop_l == mixer_node.prop_neutral + mixer_node.prop_limit
         assert prop_r == mixer_node.prop_neutral + mixer_node.prop_limit
 
     def test_large_negative_yaw_clamps_rudder_to_zero(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = -100.0
-        _, _, rudder = mixer_node.mix(cmd)
-        assert rudder == 0.0
+        _, _, rudder_l, rudder_r = mixer_node.mix(cmd)
+        assert rudder_l == 0.0
+        assert rudder_r == 0.0
 
     def test_large_positive_yaw_clamps_rudder_to_one(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = 100.0
-        _, _, rudder = mixer_node.mix(cmd)
-        assert rudder == 1.0
+        _, _, rudder_l, rudder_r = mixer_node.mix(cmd)
+        assert rudder_l == 1.0
+        assert rudder_r == 1.0
 
 
 # ── Callback tests ──────────────────────────────────────────────────────────────
@@ -126,7 +133,7 @@ class TestPublishCommands:
         _mock_clock_delta(mixer_node, delta_seconds=0.1)  # < default cmd_timeout (0.5s)
         mixer_node.last_cmd = Twist()
         mixer_node.last_cmd.linear.x = 0.2
-        mixer_node.mix = MagicMock(return_value=[0.6, 0.6, 0.55])
+        mixer_node.mix = MagicMock(return_value=[0.6, 0.6, 0.55, 0.55])
 
         mixer_node.publish_commands()
 
@@ -134,7 +141,7 @@ class TestPublishCommands:
         mixer_node.cmd_pub.publish.assert_called_once()
         msg = mixer_node.cmd_pub.publish.call_args[0][0]
         # Float64MultiArray.data is an array.array, not a list.
-        assert list(msg.data) == [0.6, 0.6, 0.55]
+        assert list(msg.data) == [0.6, 0.6, 0.55, 0.55]
 
     def test_publishes_neutral_and_skips_mix_when_stale(self, mixer_node):
         _mock_clock_delta(mixer_node, delta_seconds=10.0)  # > default cmd_timeout (0.5s)
@@ -145,4 +152,7 @@ class TestPublishCommands:
         mixer_node.mix.assert_not_called()
         msg = mixer_node.cmd_pub.publish.call_args[0][0]
         # Float64MultiArray.data is an array.array, not a list.
-        assert list(msg.data) == [mixer_node.prop_neutral, mixer_node.prop_neutral, mixer_node.rudder_center]
+        assert list(msg.data) == [
+            mixer_node.prop_neutral, mixer_node.prop_neutral,
+            mixer_node.rudder_center, mixer_node.rudder_center,
+        ]
