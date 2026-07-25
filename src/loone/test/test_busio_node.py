@@ -186,17 +186,17 @@ class TestApply:
 
     def test_clamps_fraction_and_writes_servo(self, busio_node):
         busio_node._apply({
-            'propeller_l_joint': 1.5, 'propeller_r_joint': -0.5, 'rudder_l_joint': 0.7,
+            'prop_l_joint': 1.5, 'prop_r_joint': -0.5, 'rudder_joint': 0.7,
         })
         assert busio_node.prop_l.fraction == 1.0
         assert busio_node.prop_r.fraction == 0.0
         assert busio_node.rudder.fraction == 0.7
 
     def test_publishes_state_for_applied_joints(self, busio_node):
-        busio_node._apply({'propeller_l_joint': 0.8})
+        busio_node._apply({'prop_l_joint': 0.8})
         busio_node.state_pub.publish.assert_called_once()
         msg = busio_node.state_pub.publish.call_args[0][0]
-        assert msg.name == ['propeller_l_joint']
+        assert msg.name == ['prop_l_joint']
         # JointState.position is a float64 array.array, not a list.
         assert list(msg.position) == [0.8]
 
@@ -206,21 +206,13 @@ class TestApply:
         msg = busio_node.state_pub.publish.call_args[0][0]
         assert msg.name == []
 
-    def test_both_rudder_joints_drive_the_same_physical_servo(self, busio_node):
-        # rudder_l_joint/rudder_r_joint are two independent URDF joints (one per
-        # float) but there is only one physical rudder servo behind them.
-        busio_node._apply({'rudder_l_joint': 0.2})
-        assert busio_node.rudder.fraction == 0.2
-        busio_node._apply({'rudder_r_joint': 0.9})
-        assert busio_node.rudder.fraction == 0.9
-
 
 class TestCommandCallback:
     """command_callback() maps a JointState command onto _apply()."""
 
     def test_applies_commands_from_name_position_lists(self, busio_node):
         msg = MagicMock()
-        msg.name = ['propeller_l_joint', 'rudder_l_joint']
+        msg.name = ['prop_l_joint', 'rudder_joint']
         msg.position = [0.8, 0.6]
 
         busio_node.command_callback(msg)
@@ -238,7 +230,7 @@ class TestCommandCallback:
             return_value=MagicMock(now=MagicMock(return_value=sentinel_time)))
 
         msg = MagicMock()
-        msg.name = ['propeller_l_joint']
+        msg.name = ['prop_l_joint']
         msg.position = [0.5]
         busio_node.command_callback(msg)
 
@@ -246,7 +238,7 @@ class TestCommandCallback:
 
     def test_ignores_command_when_position_shorter_than_name(self, busio_node):
         msg = MagicMock()
-        msg.name = ['propeller_l_joint', 'propeller_r_joint', 'rudder_l_joint']
+        msg.name = ['prop_l_joint', 'prop_r_joint', 'rudder_joint']
         msg.position = [0.8]  # shorter than name list
 
         busio_node._apply = MagicMock()

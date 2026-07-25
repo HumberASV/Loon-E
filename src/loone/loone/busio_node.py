@@ -52,7 +52,7 @@ class BusioNode(Node):
     PULSE_MAX_LIMIT = 2500
 
     # Which JointState field carries the command. Must match the URDF command interface type
-    # ("position" -> .position, "velocity" -> .velocity). See le1000_urdf_t4.urdf.xacro.
+    # ("position" -> .position, "velocity" -> .velocity). See loone_asv.urdf.xacro.
     JOINT_COMMAND_FIELD = 'position'
 
     def __init__(self) -> None:
@@ -86,23 +86,19 @@ class BusioNode(Node):
 
         # Map ros2_control joint names -> the servo object on each PCA9685 channel.
         # Channel assignment is unchanged from motor.py: ch0 prop_l, ch1 prop_r, ch2 rudder.
-        # These names MUST match the joints declared in le1000_urdf_t4.urdf.xacro
-        # (src/loone_urdf) / ros2_control.yaml. That URDF models two independent
-        # rudder joints (one per float) but there is only ONE physical rudder
-        # servo, so both joint names are mapped onto the same servo object --
-        # they always move together.
+        # These names MUST match the joints declared in loone_asv.urdf.xacro
+        # (src/loone_urdf) / ros2_control.yaml. That URDF models a single
+        # rudder_joint, matching the one physical rudder servo 1:1.
         self.joint_to_servo = {
-            'propeller_l_joint': self.prop_l,
-            'propeller_r_joint': self.prop_r,
-            'rudder_l_joint': self.rudder,
-            'rudder_r_joint': self.rudder,
+            'prop_l_joint': self.prop_l,
+            'prop_r_joint': self.prop_r,
+            'rudder_joint': self.rudder,
         }
         # Per-joint neutral used at startup, on stale commands, and on shutdown.
         self.joint_neutral = {
-            'propeller_l_joint': self.prop_neutral,
-            'propeller_r_joint': self.prop_neutral,
-            'rudder_l_joint': self.rudder_center,
-            'rudder_r_joint': self.rudder_center,
+            'prop_l_joint': self.prop_neutral,
+            'prop_r_joint': self.prop_neutral,
+            'rudder_joint': self.rudder_center,
         }
 
         # ---- ROS wiring ----

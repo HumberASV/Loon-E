@@ -5,12 +5,10 @@ Starts, in order:
                               (provides map->odom->zedx_camera_link TF, /odom, /scan).
   2. robot_state_publisher  - publishes base_link + prop/rudder frames from the URDF.
   3. static_transform_pub   - connects zedx_camera_link -> base_link (the camera is the
-                              tracked frame; see le1000_urdf_t4.urdf.xacro for why
-                              base_link hangs below it). Note: that URDF also declares
-                              its own fixed cam_1_link/cam_2_link (cosmetic ZED mesh
-                              placeholders on base_link) -- those are separate from,
-                              and do not conflict with, the live zedx_camera_link frame
-                              this static transform bridges.
+                              tracked frame; see loone_asv.urdf.xacro for why base_link
+                              hangs below it). That URDF does not declare a camera link
+                              of its own, so there is nothing else to conflict with the
+                              live zedx_camera_link frame this static transform bridges.
   4. controller_manager     - ros2_control node hosting the hardware + controllers.
   5. spawners               - joint_state_broadcaster + asv_forward_controller.
   6. thrust_mixer           - /cmd_vel -> /asv_forward_controller/commands.
@@ -54,8 +52,10 @@ def generate_launch_description():
 
     # Expand the xacro once and share the result with rsp + controller_manager.
     # Robot description lives in the le1000_urdf_t4 submodule (src/loone_urdf),
-    # not this package -- see its urdf/le1000_urdf_t4.urdf.xacro.
-    xacro_path = os.path.join(urdf_share, 'urdf', 'le1000_urdf_t4.urdf.xacro')
+    # not this package -- see its urdf/loone_asv.urdf.xacro. (Using the minimal
+    # loone_asv description for now instead of the CAD-derived le1000_urdf_t4 one;
+    # swap this filename back to switch.)
+    xacro_path = os.path.join(urdf_share, 'urdf', 'loone_asv.urdf.xacro')
     robot_description = {
         'robot_description': ParameterValue(Command(['xacro ', xacro_path]), value_type=str)
     }

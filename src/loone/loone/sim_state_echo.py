@@ -31,21 +31,17 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from sensor_msgs.msg import JointState
 
-# Joint names as declared in le1000_urdf_t4.urdf.xacro (src/loone_urdf).
+# Joint names as declared in loone_asv.urdf.xacro (src/loone_urdf).
 # Publishing state for a joint ros2_control does not know about is harmless;
-# MISSING one leaves that state interface at NaN, so always echo all four.
-# rudder_l_joint/rudder_r_joint are two independent URDF joints (one per
-# float) mirrored onto the single physical rudder servo -- see thrust_mixer.py
-# / busio_node.py.
-JOINTS = ['propeller_l_joint', 'propeller_r_joint', 'rudder_l_joint', 'rudder_r_joint']
+# MISSING one leaves that state interface at NaN, so always echo all three.
+JOINTS = ['prop_l_joint', 'prop_r_joint', 'rudder_joint']
 
 # Neutral fractions, matching thrust_mixer.py / busio_node.py defaults. These
 # seed the state before the first command arrives so ros2_control never sees NaN.
 NEUTRAL = {
-    'propeller_l_joint': 0.5,
-    'propeller_r_joint': 0.5,
-    'rudder_l_joint': 0.55,
-    'rudder_r_joint': 0.55,
+    'prop_l_joint': 0.5,
+    'prop_r_joint': 0.5,
+    'rudder_joint': 0.55,
 }
 
 
@@ -55,7 +51,7 @@ class SimStateEcho(Node):
     def __init__(self) -> None:
         super().__init__('sim_state_echo')
 
-        # Topic names must match the hardware params in le1000_urdf_t4.urdf.xacro.
+        # Topic names must match the hardware params in loone_asv.urdf.xacro.
         self.declare_parameter('joint_commands_topic', '/asv/joint_commands')
         self.declare_parameter('joint_states_topic', '/asv/joint_states')
         # Keep publishing even when no command arrives, so ros2_control's state

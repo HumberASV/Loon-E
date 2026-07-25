@@ -20,11 +20,8 @@ Output convention (matches the old motor.py servo fractions):
     * rudder:     0.0 = full one way, `center` (~0.55) = straight, 1.0 = full other way
     The busio_node node converts these fractions to PCA9685 pulse widths.
 
-The URDF (le1000_urdf_t4, src/loone_urdf) models two independent rudder joints
-(one per float, twin-float catamaran), but the boat has only ONE physical
-rudder servo -- mix()/publish_commands() below publish the same rudder
-fraction into both rudder slots, and busio_node.py maps both joint names onto
-that one servo.
+The URDF (loone_asv, src/loone_urdf) models a single rudder_joint, matching
+the one physical rudder servo 1:1.
 """
 
 import rclpy
@@ -100,7 +97,7 @@ class ThrustMixer(Node):
         self.last_cmd_time = self.get_clock().now()
 
     def mix(self, cmd: Twist) -> list:
-        """Map a Twist to [prop_l, prop_r, rudder_l, rudder_r] fractions.
+        """Map a Twist to [prop_l, prop_r, rudder] fractions.
 
         This is the piece most worth tuning/replacing. The default is a simple
         differential-thrust + rudder mix -- the same idea as motor.py's drive():
@@ -113,9 +110,7 @@ class ThrustMixer(Node):
                  boat is under-actuated.
 
         Returns:
-            [prop_l, prop_r, rudder_l, rudder_r] as fractions (see module
-            docstring); rudder_l == rudder_r since there is only one physical
-            rudder servo behind the URDF's two rudder joints.
+            [prop_l, prop_r, rudder] as fractions (see module docstring).
         """
         surge = cmd.linear.x
         yaw = cmd.angular.z
@@ -140,25 +135,20 @@ class ThrustMixer(Node):
         #     output into `diff`/`rudder`. Port kp/ki/kd + clamp from motor.py drive().
         #     nav2 already closes the heading loop at the trajectory level, so this is
         #     off by default; add it only if drift is a problem on the water.
-        # Duplicated for rudder_l_joint/rudder_r_joint -- see module docstring.
-        return [prop_l, prop_r, rudder, rudder]
+        return [prop_l, prop_r, rudder]
 
     def publish_commands(self) -> None:
         """Timer callback: publish the mixed command, or neutral if the command is stale."""
         age = (self.get_clock().now() - self.last_cmd_time).nanoseconds * 1e-9
         if age > self.cmd_timeout:
-            # Dead-man: no fresh command -> stop the props and center the rudder(s).
-            fractions = [
-                self.prop_neutral, self.prop_neutral,
-                self.rudder_center, self.rudder_center,
-            ]
+            # Dead-man: no fresh command -> stop the props and center the rudder.
+            fractions = [self.prop_neutral, self.prop_neutral, self.rudder_center]
         else:
             fractions = self.mix(self.last_cmd)
 
         msg = Float64MultiArray()
         # ORDER MATTERS: must match the `joints:` order in ros2_control.yaml
-        # (asv_forward_controller) -> [propeller_l_joint, propeller_r_joint,
-        # rudder_l_joint, rudder_r_joint].
+        # (asv_forward_controller) -> [prop_l_joint, prop_r_joint, rudder_joint].
         msg.data = [float(x) for x in fractions]
         self.cmd_pub.publish(msg)
 
