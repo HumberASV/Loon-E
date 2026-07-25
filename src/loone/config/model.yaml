@@ -1,0 +1,62 @@
+/**:
+  ros__parameters:
+    object_detection:
+      custom_onnx_file: 'model/loone.onnx'              # Path to your ONNX file - overridden with an absolute installed path by slam_launch.py's `param_overrides`
+      custom_onnx_input_size: 512       # Input resolution (e.g., 512 for 1x3x512x512 tensor)
+      custom_class_count: 7            # Number of classes in your model (e.g., 80 for COCO)
+
+      class_000:
+        label: 'green'
+        model_class_id: 0
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation buoy
+        is_static: true
+
+      class_001:
+        label: 'red'
+        model_class_id: 1
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation buoy
+        is_static: true
+
+      class_002:
+        label: 'north'
+        model_class_id: 2
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation marker
+        is_static: true
+
+      class_003:
+        label: 'east'
+        model_class_id: 3
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation marker
+        is_static: true
+
+      class_004:
+        label: 'south'
+        model_class_id: 4
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation marker
+        is_static: true
+
+      class_005:
+        label: 'west'
+        model_class_id: 5
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Floating navigation marker
+        is_static: true
+
+      class_006:
+        label: 'otter'
+        model_class_id: 6
+        enabled: true
+        confidence_threshold: 50.0
+        is_grounded: true   # Another vessel/obstacle, not anchored
+        is_static: false

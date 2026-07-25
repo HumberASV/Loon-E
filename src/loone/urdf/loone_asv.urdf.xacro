@@ -1,0 +1,134 @@
+<?xml version="1.0"?>
+<!--
+  loone_asv.urdf.xacro - minimal vehicle description for the Loon-E ASV.
+
+  Purpose:
+    * Give nav2 a `base_link` robot base frame (there was none before).
+    * Declare the three actuated joints (2 propellers + 1 rudder) and expose them
+      to ros2_control through the stock topic_based_ros2_control hardware.
+
+  What this is NOT:
+    * It does not include the ZED camera description. The ZED wrapper already runs
+      its own robot_state_publisher and publishes `odom -> zedx_camera_link`. We
+      connect the camera frame to `base_link` with a single static_transform_publisher
+      in bringup.launch.py instead, so no frame is broadcast by two publishers.
+
+  TF layout produced with the launch file:
+      map (SLAM Toolbox)
+        -> odom (ZED)
+          -> zedx_camera_link (ZED)
+            -> base_link            (static_transform_publisher, in bringup.launch.py)
+              -> prop_l / prop_r / rudder links   (this file, via robot_state_publisher)
+
+  NOTE on the tree shape: ZED publishes odom -> zedx_camera_link directly and this
+  wrapper version has no "base_frame" parameter, so base_link necessarily hangs
+  BELOW the camera. That is unconventional (usually odom -> base_link -> sensors)
+  but TF-valid. If you later want the classic layout, make the ZED track base_link
+  and flip the static transform. See bringup.launch.py TODO.
+-->
+<robot xmlns:xacro="http://wiki.ros.org/xacro" name="loone_asv">
+
+  <!-- ============================ Tunable geometry ============================ -->
+  <!-- TODO(team): measure the real boat. These are placeholders just so RViz shows
+       roughly the right shape; only the joint axes matter for control. -->
+  <xacro:property name="hull_length" value="1.0"/>   <!-- m -->
+  <xacro:property name="hull_width"  value="0.6"/>   <!-- m -->
+  <xacro:property name="hull_height" value="0.2"/>   <!-- m -->
+  <xacro:property name="prop_x"      value="-0.45"/> <!-- props near the stern -->
+  <xacro:property name="prop_y"      value="0.25"/>  <!-- half the thruster separation -->
+  <xacro:property name="rudder_x"    value="-0.55"/> <!-- rudder behind the props -->
+
+  <material name="hull_grey"><color rgba="0.3 0.3 0.35 1.0"/></material>
+  <material name="prop_dark"><color rgba="0.1 0.1 0.1 1.0"/></material>
+
+  <!-- ============================ Links ============================ -->
+  <!-- base_link: the robot base frame nav2 plans for. Origin ~ boat center. -->
+  <link name="base_link">
+    <visual>
+      <geometry><box size="${hull_length} ${hull_width} ${hull_height}"/></geometry>
+      <material name="hull_grey"/>
+    </visual>
+    <collision>
+      <geometry><box size="${hull_length} ${hull_width} ${hull_height}"/></geometry>
+    </collision>
+    <!-- Minimal inertial so URDF tools don't warn; not used without a physics sim. -->
+    <inertial>
+      <mass value="10.0"/>
+      <inertia ixx="0.5" ixy="0.0" ixz="0.0" iyy="1.0" iyz="0.0" izz="1.0"/>
+    </inertial>
+  </link>
+
+  <!-- Simple placeholder links for the two thrusters and the rudder. -->
+  <link name="prop_l_link"><visual><geometry><cylinder radius="0.05" length="0.08"/></geometry><material name="prop_dark"/></visual></link>
+  <link name="prop_r_link"><visual><geometry><cylinder radius="0.05" length="0.08"/></geometry><material name="prop_dark"/></visual></link>
+  <link name="rudder_link"><visual><geometry><box size="0.02 0.05 0.15"/></geometry><material name="prop_dark"/></visual></link>
+
+  <!-- ============================ Joints ============================ -->
+  <!-- The propellers spin about their thrust axis. We model them as `continuous`
+       so ros2_control can expose a command interface; the numeric command is a
+       normalized [0,1] thrust fraction, NOT a real angle (see interface note below). -->
+  <joint name="prop_l_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="prop_l_link"/>
+    <origin xyz="${prop_x} ${prop_y} 0" rpy="0 1.5708 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <joint name="prop_r_joint" type="continuous">
+    <parent link="base_link"/>
+    <child link="prop_r_link"/>
+    <origin xyz="${prop_x} ${-prop_y} 0" rpy="0 1.5708 0"/>
+    <axis xyz="0 0 1"/>
+  </joint>
+
+  <!-- Rudder deflects left/right about the vertical axis. `revolute` with generous
+       limits; the numeric command is a normalized [0,1] fraction (0.55 ~ straight). -->
+  <joint name="rudder_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="rudder_link"/>
+    <origin xyz="${rudder_x} 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-0.6" upper="0.6" effort="5.0" velocity="3.0"/>
+  </joint>
+
+  <!-- ============================ ros2_control ============================ -->
+  <!--
+    Stock topic_based_ros2_control hardware: it bridges the command/state interfaces
+    below to plain ROS topics instead of a real driver, so we can keep the actual
+    PCA9685 access in the Python pca9685_driver node (no C++).
+
+    Data flow:
+      * TopicBasedSystem PUBLISHES the command-interface values as sensor_msgs/JointState
+        on `joint_commands_topic`  -> pca9685_driver subscribes and writes I2C.
+      * TopicBasedSystem SUBSCRIBES `joint_states_topic` for the state-interface values
+        <- pca9685_driver publishes an (open-loop) echo.
+
+    Interface choice: we use "position" for all three joints because a PCA9685 servo
+    fraction is a position-like [0,1] command, and one ForwardCommandController can
+    only drive ONE interface type. The value is a normalized fraction, not radians.
+    If you prefer velocity semantics for the thrusters, change name="position" to
+    name="velocity" here AND set JOINT_COMMAND_FIELD='velocity' in pca9685_driver.py
+    AND interface_name in ros2_control.yaml.
+  -->
+  <ros2_control name="asv" type="system">
+    <hardware>
+      <plugin>topic_based_ros2_control/TopicBasedSystem</plugin>
+      <param name="joint_commands_topic">/asv/joint_commands</param>
+      <param name="joint_states_topic">/asv/joint_states</param>
+    </hardware>
+
+    <joint name="prop_l_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="prop_r_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+    <joint name="rudder_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+    </joint>
+  </ros2_control>
+
+</robot>

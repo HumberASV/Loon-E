@@ -1,0 +1,3 @@
+[submodule "src/zedx"]
+	path = src/zedx
+	url = https://github.com/HumberASV/zed-ros2-wrapper

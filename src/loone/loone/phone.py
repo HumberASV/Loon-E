@@ -5,6 +5,7 @@ import threading
 import numpy as np
 import socket
 import subprocess
+from sensor_msgs.msg import NavSatFix
 
 class Phone(Node):
     """
@@ -25,9 +26,10 @@ class Phone(Node):
         """
         super().__init__('Phone_Pub')
 
-        #Publishers
+        #Publishers, sensor_msg
         self.phone_pub = self.create_publisher(Float32MultiArray, 'phone', 10)
-        
+        self.navsat_pub = self.create_publisher(NavSatFix, 'navsatfix', 10)
+
         # Declare parameters with fallback/default values
         self.declare_parameter('phone_port', 5000)
         self.declare_parameter('computer_port', 5000)
@@ -50,6 +52,15 @@ class Phone(Node):
         self.receiver = threading.Thread(target = self.get_odometry, daemon = True)
         self.receiver.start()
         self.get_logger().info(f"Phone node initialized. Listening on {self.HOST}:{self.PORT} and routing to phone port {self.PHONE_PORT}.")
+
+
+    def publish_navsatfix(self):
+        msg = NavSatFix()
+        msg.latitude = self.latitude
+        msg.longitude = self.longitude
+        msg.altitude = 0.0  # Assuming altitude is not provided by the phone
+        msg.position_covariance_type = NavSatFix.COVARIANCE_TYPE_UNKNOWN  # Covariance type can be set as needed
+        self.navsat_pub.publish(msg)
 
     def publish_phone(self):
         msg = Float32MultiArray()
@@ -96,7 +107,8 @@ class Phone(Node):
                                 continue
                             
                             self.publish_phone()
-    
+                            self.publish_navsatfix()
+
     def get_adb_devices(self):
         # Execute native 'adb devices' in terminal
         output = subprocess.check_output(["adb","devices"]).decode("utf-8")

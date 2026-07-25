@@ -29,6 +29,17 @@ jobs:
           python3 -m pip install --upgrade pip
           python3 -m pip install pytest numpy adafruit-circuitpython-motor adafruit-circuitpython-pca9685
 
+      - name: Install ROS package dependencies
+        run: |
+          source /opt/ros/humble/setup.bash
+          sudo apt-get update
+          sudo apt-get install -y \
+            ros-humble-navigation2 \
+            ros-humble-nav2-bringup \
+            ros-humble-turtlebot3-bringup \
+            ros-humble-turtlebot3-navigation2 \
+            ros-humble-zed-msgs
+
       - name: Run motor unit tests
         run: |
           source /opt/ros/humble/setup.bash

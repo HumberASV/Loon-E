@@ -34,6 +34,7 @@ class Mapping(Node):
         self.declare_parameter('global_l', 50)
         self.declare_parameter('res', 0.5)
         self.declare_parameter('start_position', 0)
+        self.declare_parameter('map_frame', 'gps_map')
 
         # Retrieve parameters
         self.local_w = self.get_parameter('local_w').value
@@ -42,6 +43,7 @@ class Mapping(Node):
         self.global_l = self.get_parameter('global_l').value
         self.res      = self.get_parameter('res').value
         start_position = self.get_parameter('start_position').value
+        self.map_frame = self.get_parameter('map_frame').value
 
         #Other internal variables
         self.local_rows = self.get_cell(self.local_w)
@@ -90,6 +92,8 @@ class Mapping(Node):
     def publish_map(self) -> None:
         """ Publish the global map as an Int8MultiArray message. """
         msg = OccupancyGrid()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = self.map_frame
         msg.info.resolution = self.res
         msg.info.height, msg.info.width = self.global_map.shape
         msg.data = self.global_map.flatten().tolist()
@@ -105,9 +109,14 @@ class Mapping(Node):
         # roll and pitch are zero.
         msg = PoseStamped()
         msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "map"
-        msg.pose.position.x = float(self.global_position[1])
-        msg.pose.position.y = float(self.global_position[0])
+        # `global_position` is this node's own [row, col] grid-cell bookkeeping,
+        # built by dead-reckoning phone GPS deltas - it has no TF relationship
+        # to the `map` frame SLAM Toolbox publishes from laser scan matching,
+        # so it's published in its own distinct frame instead of "map" to
+        # avoid two unrelated coordinate systems claiming the same frame_id.
+        msg.header.frame_id = self.map_frame
+        msg.pose.position.x = float(self.global_position[1]) * self.res
+        msg.pose.position.y = float(self.global_position[0]) * self.res
         msg.pose.position.z = 0.0 # assumed
         if np.isnan(self.heading):
             # If heading is not yet available, fall back to the identity quaternion.

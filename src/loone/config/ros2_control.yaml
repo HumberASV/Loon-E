@@ -1,0 +1,37 @@
+# config/ros2_control.yaml
+# controller_manager configuration for the Loon-E ASV.
+#
+# Two controllers run inside the controller_manager:
+#   * joint_state_broadcaster  - reads the state interfaces and publishes /joint_states
+#     (this is what robot_state_publisher uses to place the prop/rudder links in TF).
+#   * asv_forward_controller   - a stock ForwardCommandController that forwards the
+#     [prop_l, prop_r, rudder] fractions it receives on
+#     /asv_forward_controller/commands straight to the "position" command interfaces.
+#
+# The thrust_mixer node publishes to /asv_forward_controller/commands; the hardware
+# side (topic_based_ros2_control) then relays the command interfaces to the
+# pca9685_driver node. See loone_asv.urdf.xacro for the interface declarations.
+
+controller_manager:
+  ros__parameters:
+    # TODO(team): match this to how fast you want to push PWM updates. The PCA9685
+    # itself refreshes at `freq` Hz (50 by default); 50 Hz here is a sensible start.
+    update_rate: 50  # Hz
+    use_sim_time: false
+
+    joint_state_broadcaster:
+      type: joint_state_broadcaster/JointStateBroadcaster
+
+    asv_forward_controller:
+      type: forward_command_controller/ForwardCommandController
+
+# ForwardCommandController: the `joints` order here defines the order of the
+# Float64MultiArray that thrust_mixer must publish -> [prop_l, prop_r, rudder].
+asv_forward_controller:
+  ros__parameters:
+    joints:
+      - prop_l_joint
+      - prop_r_joint
+      - rudder_joint
+    # Must match the command_interface name in loone_asv.urdf.xacro.
+    interface_name: position

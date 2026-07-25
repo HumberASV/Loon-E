@@ -1,0 +1,11 @@
+# config/depth_to_laserscan.yaml
+# Parameters for the `depthimage_to_laserscan` node used to synthesize a 2D
+# LaserScan from the ZED X depth image, for consumption by SLAM Toolbox.
+---
+/**:
+    ros__parameters:
+        scan_time: 0.033 # Time in seconds between scans reported in the LaserScan message
+        range_min: 0.3 # Points closer than this (in meters) are discarded - keep above zed.min_depth
+        range_max: 10.0 # Points further than this (in meters) are discarded - must be <= zedx.yaml depth.max_depth
+        scan_height: 1 # Number of rows of the depth image used for the laser projection
+        output_frame: "zedx_left_camera_frame" # [overwritten by launch file] frame the LaserScan is published in

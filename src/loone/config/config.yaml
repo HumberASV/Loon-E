@@ -33,6 +33,7 @@
     global_l: 50      # Global map length in meters
     res: 0.5          # Map resolution in meters per cell
     start_position: 4 # Starting quadrant/position (0.5–4, see mapping.py)
+    map_frame: "gps_map" # Frame_id for the GPS/object-detection-based global map and position, kept distinct from the SLAM Toolbox "map" frame
 
 /motor:
   ros_parameters:

@@ -13,3 +13,6 @@ __pycache__/
 build/
 install/
 log/
+
+rviz-plugin-zed-od/
+zed_display_rviz2/
