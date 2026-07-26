@@ -46,9 +46,10 @@ setup(
             # Simulation only: stands in for busio_node's open-loop state echo
             # when the real driver is not running (see sim_state_echo.py).
             'sim_state_echo = loone.sim_state_echo:main',
-            # Bench-test utilities (see spin.launch.py / motor_test.launch.py).
+            # Bench-test utilities (see spin.launch.py / motor_test.launch.py / forward.launch.py).
             'spin_node = loone.spin_node:main',
             'motor_test_node = loone.motor_test_node:main',
+            'forward_node = loone.forward_node:main',
         ],
     },
 )

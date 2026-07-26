@@ -61,45 +61,48 @@ class TestMix:
             mixer_node.prop_neutral, mixer_node.prop_neutral, mixer_node.rudder_center,
         ]
 
-    def test_positive_surge_raises_both_props_equally(self, mixer_node):
+    def test_positive_surge_lowers_both_props_equally(self, mixer_node):
+        # Bench-test 2026-07-26: forward (positive linear.x) is negated to match the
+        # boat's real polarity -- see mix()'s surge comment. So a forward command now
+        # moves both prop fractions BELOW neutral, not above.
         cmd = Twist()
         cmd.linear.x = 0.2  # no yaw -> symmetric throttle bump, rudder stays centered
         prop_l, prop_r, rudder = mixer_node.mix(cmd)
-        assert prop_l == prop_r > mixer_node.prop_neutral
+        assert prop_l == prop_r < mixer_node.prop_neutral
         assert rudder == mixer_node.rudder_center
 
-    def test_positive_yaw_biases_left_prop_higher_and_rudder_off_center(self, mixer_node):
+    def test_positive_yaw_biases_right_prop_higher_and_rudder_other_way(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = 0.5
         prop_l, prop_r, rudder = mixer_node.mix(cmd)
-        assert prop_l > prop_r
-        assert rudder > mixer_node.rudder_center
+        assert prop_r > prop_l
+        assert rudder < mixer_node.rudder_center
 
-    def test_negative_yaw_biases_right_prop_higher_and_rudder_other_way(self, mixer_node):
+    def test_negative_yaw_biases_left_prop_higher_and_rudder_off_center(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = -0.5
         prop_l, prop_r, rudder = mixer_node.mix(cmd)
-        assert prop_r > prop_l
-        assert rudder < mixer_node.rudder_center
+        assert prop_l > prop_r
+        assert rudder > mixer_node.rudder_center
 
     def test_large_surge_saturates_props_at_prop_limit(self, mixer_node):
         cmd = Twist()
         cmd.linear.x = 100.0
         prop_l, prop_r, _ = mixer_node.mix(cmd)
-        assert prop_l == mixer_node.prop_neutral + mixer_node.prop_limit
-        assert prop_r == mixer_node.prop_neutral + mixer_node.prop_limit
+        assert prop_l == mixer_node.prop_neutral - mixer_node.prop_limit
+        assert prop_r == mixer_node.prop_neutral - mixer_node.prop_limit
 
-    def test_large_negative_yaw_clamps_rudder_to_zero(self, mixer_node):
+    def test_large_negative_yaw_clamps_rudder_to_one(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = -100.0
         _, _, rudder = mixer_node.mix(cmd)
-        assert rudder == 0.0
+        assert rudder == 1.0
 
-    def test_large_positive_yaw_clamps_rudder_to_one(self, mixer_node):
+    def test_large_positive_yaw_clamps_rudder_to_zero(self, mixer_node):
         cmd = Twist()
         cmd.angular.z = 100.0
         _, _, rudder = mixer_node.mix(cmd)
-        assert rudder == 1.0
+        assert rudder == 0.0
 
 
 # ── Callback tests ──────────────────────────────────────────────────────────────
