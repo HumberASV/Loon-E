@@ -22,6 +22,8 @@
   <exec_depend>nav2_bringup</exec_depend>
   <!-- gps_waypoint_mission: FollowWaypoints action client (see task1.launch.py) -->
   <exec_depend>nav2_msgs</exec_depend>
+  <!-- gps_waypoint_mission: FromLL request field is a geographic_msgs/GeoPoint -->
+  <exec_depend>geographic_msgs</exec_depend>
 
   <!-- nav2 + ros2_control chain (see bringup.launch.py) -->
   <exec_depend>ros2_control</exec_depend>

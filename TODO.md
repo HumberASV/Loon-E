@@ -42,16 +42,34 @@ Dashed = not built yet.
 
 ## Now — MVP GPS-waypoint mission (Task 1)
 
-- [ ] `src/loone/loone/gps_waypoint_mission.py`: reads a JSON list of `{"lat","lon"}`
-      points, converts each via `/fromLL`, sends one `FollowWaypoints` goal.
-- [ ] `src/loone/launch/task1.launch.py`: `bringup.launch.py` + `gps_waypoint_mission`.
-- [ ] `src/loone/config/task1_waypoints.json`: placeholder default course (**replace
-      with real Task 1 coordinates before running on the water**).
+- [x] `src/loone/loone/gps_waypoint_mission.py`: reads a JSON list of `{"lat","lon"}`
+      points, converts each via `/fromLL`, sends one `FollowWaypoints` goal. Covered by
+      `test/test_gps_waypoint_mission.py` (JSON/file param parsing, pose/yaw building).
+- [x] `src/loone/launch/task1.launch.py`: `bringup.launch.py` + `gps_waypoint_mission`.
+- [x] `src/loone/config/task1_waypoints.json`: now holds a real 4-point course near Humber
+      College (was a 3-point Toronto placeholder). **Fixed a bug 2026-07-26: the file had
+      `//`-style trailing comments, which is invalid JSON — `_load_waypoints()` would have
+      caught the `JSONDecodeError` and silently sent no mission.** Confirm these are the
+      intended Task 1 points (vs. a bench/practice location) before running on the water.
 - [ ] Bench-test: `ros2 launch loone task1.launch.py sim:=true use_sim_time:=true`,
       confirm `/fromLL` appears and the mission node converts points.
+      **Blocked 2026-07-26**: `build/`, `install/`, `log/` are root-owned from an earlier
+      `sudo colcon build`, and this session has no interactive TTY for a sudo password, so
+      the new `gps_waypoint_mission` executable was never installed (`install/loone` still
+      predates this feature — no `gps_waypoint_mission` console script, no `task1.launch.py`).
+      Static checks (syntax, JSON, package/dependency resolution via `ros2 pkg list`) all
+      passed. To finish this step, run once:
+      `sudo colcon build --packages-select loone --symlink-install`, then
+      `source install/setup.bash && ros2 launch loone task1.launch.py sim:=true use_sim_time:=true`
+      (`sim:=true` swaps `busio_node` for `sim_state_echo`, so this does not drive real
+      thrusters — but `slam_launch.py` still starts the real `zed_wrapper` node, which needs
+      a camera or a mocked `/clock`/topics to fully validate).
 - [ ] On-water test: verify `WAYPOINT_FRAME_ID = 'odom'` assumption in
       `gps_waypoint_mission.py` and the ZED `imu/data` topic name assumption in
-      `bringup.launch.py`'s `navsat_transform` node (both marked `TODO(team)`).
+      `bringup.launch.py`'s `navsat_transform` node (both marked `TODO(team)`). Needs a live
+      ZED node to check `ros2 topic echo <camera_name>/<zed_node_name>/odom --field header.frame_id`
+      — not checkable from this sandbox (no camera, and this session currently can't reach a
+      live ROS graph beyond the local machine).
 
 This MVP intentionally has **no awareness of buoys, cardinal marks, or the Otter** —
 it will drive straight through the GPS points and rely only on Nav2's costmap/laser

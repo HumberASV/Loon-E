@@ -18,10 +18,10 @@ import math
 import rclpy
 from rclpy.action import ActionClient
 from rclpy.node import Node
+from geographic_msgs.msg import GeoPoint
 from geometry_msgs.msg import PoseStamped
 from nav2_msgs.action import FollowWaypoints
 from robot_localization.srv import FromLL
-from sensor_msgs.msg import NavSatFix
 
 
 class GpsWaypointMission(Node):
@@ -56,7 +56,7 @@ class GpsWaypointMission(Node):
         points = []
         for lat, lon in waypoints:
             request = FromLL.Request()
-            request.ll_point = NavSatFix(latitude=lat, longitude=lon)
+            request.ll_point = GeoPoint(latitude=lat, longitude=lon)
             future = from_ll_client.call_async(request)
             rclpy.spin_until_future_complete(self, future)
             if future.result() is None:
