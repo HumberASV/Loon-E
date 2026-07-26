@@ -20,6 +20,8 @@
   <exec_depend>sensor_msgs</exec_depend>
   <exec_depend>navigation2</exec_depend>
   <exec_depend>nav2_bringup</exec_depend>
+  <!-- gps_waypoint_mission: FollowWaypoints action client (see task1.launch.py) -->
+  <exec_depend>nav2_msgs</exec_depend>
 
   <!-- nav2 + ros2_control chain (see bringup.launch.py) -->
   <exec_depend>ros2_control</exec_depend>
@@ -50,6 +52,8 @@
   <exec_depend>zed_wrapper</exec_depend>
   <exec_depend>depthimage_to_laserscan</exec_depend>
   <exec_depend>slam_toolbox</exec_depend>
+  <!-- navsat_transform_node: GPS<->map/odom conversion (/fromLL, /toLL) for waypoint missions -->
+  <exec_depend>robot_localization</exec_depend>
 
   <export>
     <build_type>ament_python</build_type>

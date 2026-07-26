@@ -13,7 +13,8 @@ setup(
             ['resource/' + package_name]),
         ('share/' + package_name, ['package.xml']),
         (os.path.join('share', package_name, 'launch'), glob('launch/*.py')),
-        (os.path.join('share', package_name, 'config'), glob('config/*.yaml')),
+        (os.path.join('share', package_name, 'config'),
+            glob('config/*.yaml') + glob('config/*.json')),
         (os.path.join('share', package_name, 'urdf'), glob('urdf/*')),
         (os.path.join('share', package_name, 'model'), glob('model/*.onnx')),
         (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
@@ -40,6 +41,8 @@ setup(
             'thrust_mixer = loone.thrust_mixer:main',
             'busio_node = loone.busio_node:main',
             'battery_node = loone.battery_node:main',
+            # Task 1: GPS point list -> nav2 follow_waypoints (see task1.launch.py)
+            'gps_waypoint_mission = loone.gps_waypoint_mission:main',
             # Simulation only: stands in for busio_node's open-loop state echo
             # when the real driver is not running (see sim_state_echo.py).
             'sim_state_echo = loone.sim_state_echo:main',

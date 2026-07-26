@@ -17,6 +17,9 @@ Starts, in order:
   8. battery_node           - battery_raw -> proper sensor_msgs/BatteryState topics.
   9. phone                  - phone GPS (ADB) -> /navsatfix, fused into the ZED's
                               pos_tracking via gnss_fusion (config/common_stereo.yaml).
+  9b. navsat_transform      - GPS<->map/odom conversion utility (config/navsat_transform.yaml).
+                              Not part of the TF/localization chain; exists only for the
+                              /fromLL, /toLL services a future GPS-waypoint mission node needs.
  10. navigation_launch.py   - nav2 planner/controller/costmaps -> /cmd_vel.
 
 The old task/motor/path_planning nodes are intentionally NOT started here.
@@ -179,6 +182,25 @@ def generate_launch_description():
         output='screen',
     )
 
+    # 9b. GPS<->map/odom conversion utility -- NOT part of the TF/localization chain
+    #     (see config/navsat_transform.yaml). Exposes /fromLL and /toLL so a future
+    #     mission node can turn a list of lat/lon waypoints into Nav2 goals.
+    navsat_transform_params = os.path.join(loone_share, 'config', 'navsat_transform.yaml')
+    navsat_transform = Node(
+        package='robot_localization',
+        executable='navsat_transform_node',
+        name='navsat_transform',
+        output='screen',
+        parameters=[navsat_transform_params, {'use_sim_time': use_sim_time}],
+        remappings=[
+            ('gps/fix', '/navsatfix'),
+            # TODO(team): verify against the ZED wrapper's actual topic names if you
+            # change the camera_name/zed_node_name launch args (defaults: zedx/zed_node).
+            ('imu/data', ['/', camera_name, '/', zed_node_name, '/imu/data']),
+            ('odometry/filtered', ['/', camera_name, '/', zed_node_name, '/odom']),
+        ],
+    )
+
     # 10. nav2 (produces /cmd_vel). No AMCL/map_server -- SLAM Toolbox owns those.
     nav2_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -214,5 +236,6 @@ def generate_launch_description():
         sim_state_echo,
         battery_node,
         phone,
+        navsat_transform,
         nav2_launch,
     ])

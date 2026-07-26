@@ -1,0 +1,40 @@
+# config/navsat_transform.yaml
+# robot_localization's navsat_transform_node, added ALONGSIDE the ZED wrapper's own
+# gnss_fusion (config/common_stereo.yaml, in the zed_wrapper submodule), which still
+# owns map->odom->base_link TF and pos_tracking. This node is NOT part of that chain:
+# broadcast_utm_transform is off and its odometry/gps output topic is unused. Its only
+# job is to expose the /fromLL and /toLL services (robot_localization/srv) so a
+# mission node can convert a list of GPS coordinates into map/odom-frame Nav2 goals
+# for the waypoint_follower already configured in nav2_params.yaml.
+
+navsat_transform:
+  ros__parameters:
+    use_sim_time: false
+    frequency: 10.0
+
+    # Seconds to wait after startup before latching the datum (the first synced
+    # gps+imu+odom fix). Gives the ZED's own gnss_fusion time to converge on a good
+    # heading first, since we borrow that heading below instead of raw IMU yaw.
+    delay: 5.0
+
+    # Use ZED's fused odometry yaw instead of raw IMU orientation -- gnss_fusion has
+    # already aligned it toward true north, which a raw/uncalibrated magnetometer
+    # yaw would not be. Because of this, magnetic_declination_radians is unused.
+    # TODO(team): if you switch use_odometry_yaw to false, set the declination for
+    # your sailing location instead.
+    magnetic_declination_radians: 0.0
+    yaw_offset: 0.0
+    use_odometry_yaw: true
+
+    # GPS altitude is noisy and irrelevant to a surface vehicle's 2D waypoints.
+    zero_altitude: true
+
+    # Do NOT let this node touch TF -- SLAM Toolbox + the ZED wrapper already own
+    # map->odom->base_link, and a second broadcaster would fight them.
+    broadcast_utm_transform: false
+    publish_filtered_gps: false
+
+    # Calibrate from the first live gps/imu/odom fix rather than a hardcoded survey
+    # point -- avoids re-surveying the launch site for every outing. If /fromLL
+    # results drift, consider raising `delay` above or switching to a fixed `datum`.
+    wait_for_datum: false
