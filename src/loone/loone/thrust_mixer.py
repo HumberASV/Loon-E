@@ -113,7 +113,10 @@ class ThrustMixer(Node):
             [prop_l, prop_r, rudder] as fractions (see module docstring).
         """
         surge = cmd.linear.x
-        yaw = cmd.angular.z
+        # nav2/REP-103 angular.z is CCW-positive (turn left). motor.py's proven rudder/prop
+        # mapping was tuned against a CW-positive compass heading error (turn right = positive
+        # error), so negate here to keep that validated polarity.
+        yaw = -cmd.angular.z
 
         base = self.prop_neutral + self.surge_gain * surge   # common forward/reverse throttle
         diff = self.yaw_gain * yaw                            # differential thrust for turning
