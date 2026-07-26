@@ -193,8 +193,8 @@ local_costmap:
       update_frequency: 5.0
       publish_frequency: 2.0
       rolling_window: true
-      width: 6
-      height: 6
+      width: 10
+      height: 10
       resolution: 0.05
       robot_radius: 0.6
       plugins: [obstacle_layer, inflation_layer]

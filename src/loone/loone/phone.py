@@ -56,6 +56,11 @@ class Phone(Node):
 
     def publish_navsatfix(self):
         msg = NavSatFix()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        # gps_link is a fixed child of base_link (loone_asv.urdf.xacro), at the
+        # origin -- navsat_transform_node needs a real frame_id here to look up the
+        # antenna offset instead of falling back to "assume mounted at origin".
+        msg.header.frame_id = 'gps_link'
         msg.latitude = self.latitude
         msg.longitude = self.longitude
         msg.altitude = 0.0  # Assuming altitude is not provided by the phone

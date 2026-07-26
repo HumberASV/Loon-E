@@ -117,6 +117,10 @@ class TestPublishers:
         assert msg.longitude == -79.4
         assert msg.altitude == 0.0
         assert msg.position_covariance_type == NavSatFix.COVARIANCE_TYPE_UNKNOWN
+        # Regression: navsat_transform_node needs a real frame_id to look up the
+        # antenna offset (gps_link, a fixed child of base_link) -- an empty one
+        # makes it log an error on every fix and skip the offset correction.
+        assert msg.header.frame_id == 'gps_link'
 
 
 # ── get_odometry() parsing ──────────────────────────────────────────────────────
