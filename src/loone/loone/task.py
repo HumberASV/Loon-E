@@ -37,7 +37,7 @@ class Task(Node):
     def run_task(self) -> None:
         """ Update the task command parameters and publish the message. """
         self.command = 1.0
-        self.target_heading = 0.0
+        self.target_heading = 80.0
         self.target_speed = 1.0
         self.dir = -999.0
         
