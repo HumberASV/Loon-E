@@ -6,8 +6,8 @@
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
-    rc_pin: 7
-    estop_pin: 7
+    auto_pin: 32
+    estop_pin: 33
 
 /phone:
   ros_parameters:
@@ -41,6 +41,9 @@
     prop_max: 1880    # Propeller servo max pulse width (µs)
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
+
+    auto_pin: 32
+    estop_pin: 33
 
 /battery_node:
   ros_parameters:

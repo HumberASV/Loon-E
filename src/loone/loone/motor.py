@@ -39,6 +39,7 @@ import board
 from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
+import RPi.GPIO as GPIO
 
 class MotorNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
@@ -73,6 +74,8 @@ class MotorNode(Node):
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('max', 45.0)
+        self.declare_parameter('auto_pin', 32)
+        self.declare_parameter('estop_pin', 33)
         
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
@@ -87,6 +90,8 @@ class MotorNode(Node):
         self.ki    = self.get_parameter('ki').value
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
+        self.auto_pin = self.get_parameter('auto_pin').value
+        self.estop_pin = self.get_parameter('estop_pin').value
         
         # ---- Hardware bring-up (same sequence as motor.py) ----
         self._init_busio(freq)
@@ -99,6 +104,7 @@ class MotorNode(Node):
         # Raw INA3221 bus voltages for battery_node to convert into BatteryState messages.
         self.battery_raw_pub = self.create_publisher(Float32MultiArray, 'battery_raw', 10)
         self.battery_timer = self.create_timer(timer_period, self.publish_battery_raw)
+        self.led_timer = self.create_timer(timer_period, self.set_led)
         self.get_logger().info('busio_node ready.')
 
         #Other internal variables
@@ -176,8 +182,8 @@ class MotorNode(Node):
             self.prop_l = servo.Servo(self.pca.channels[0], min_pulse=prop_min, max_pulse=prop_max)
             self.prop_r = servo.Servo(self.pca.channels[1], min_pulse=prop_min, max_pulse=prop_max)
             self.rudder = servo.Servo(self.pca.channels[2], min_pulse=rudder_min, max_pulse=rudder_max)
-            self.red = self.pca.channels[3]
-            self.green = self.pca.channels[4]
+            self.red = self.pca.channels[4]
+            self.green = self.pca.channels[5]
         except Exception as e:
             self.get_logger().error(f"Failed to initialize servo channels: {e}")
             raise
@@ -185,9 +191,10 @@ class MotorNode(Node):
         self.get_logger().info("Servo PWM channels initialized (ch0 prop_l, ch1 prop_r, ch2 rudder).")
 
     def _init_led(self):
-        self.red.duty_cycle = 0xFFFF
-        self.green.duty_cycle = 0xFFFF
-
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.auto_pin, GPIO.IN)
+        GPIO.setup(self.estop_pin, GPIO.IN)
+        
     def publish_battery_raw(self) -> None:
         """Publish the three INA3221 bus voltages [dwL, dwR, br], unconverted.
 
@@ -205,6 +212,15 @@ class MotorNode(Node):
             self.ina[2].bus_voltage,
         ]
         self.battery_raw_pub.publish(msg)
+
+    def set_led(self):
+        self.red.duty_cycle = 0xFFFF
+        self.green.duty_cycle = 0xFFFF
+
+        if GPIO.input(self.estop_pin):
+            self.green.duty_cycle = 0x0000
+        elif GPIO.input(self.auto_pin):
+            self.red.duty_cycle = 0x0000
 
     def publish_motor(self) -> None:
         # Publish the current motor state

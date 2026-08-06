@@ -60,11 +60,11 @@ class Task(Node):
         self.declare_parameter('task', [])
         self.declare_parameter('latitude', [])
         self.declare_parameter('longitude', [])
-        self.declare_parameter('rc_pin', 7)
-        self.declare_parameter('estop_pin', 7)
+        self.declare_parameter('auto_pin', 32)
+        self.declare_parameter('estop_pin', 33)
 
         # Retrieve Parameters
-        self.local_w = self.get_parameter('local_w').value
+        self.local_l = self.get_parameter('local_l').value
         self.res = self.get_parameter('res').value
         self.task = self.get_parameter('task').integer_array_value
 
@@ -72,10 +72,10 @@ class Task(Node):
         longitude = self.get_parameter('longitude').double_array_value
         self.get_path(latitude, longitude) # Merge lists
 
-        self.rc_pin = self.get_parameter('rc_pin').value
+        self.auto_pin = self.get_parameter('auto_pin').value
         self.estop_pin = self.get_parameter('estop_pin').value
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(self.rc_pin, GPIO.IN)
+        GPIO.setup(self.auto_pin, GPIO.IN)
         GPIO.setup(self.estop_pin, GPIO.IN)
 
         #Other internal variables
@@ -86,7 +86,7 @@ class Task(Node):
         self.position = np.array([[-999, -999]]) # Current GPS position
         self.heading = -999 # Current Heading
         self.objects = [-999] # Current objects in view
-        self.locations = [[-999, -999]] # Current position of objects
+        self.locations = [[-999, -999, -999]] # Current position of objects in [x, y, z]
         self.global_position = np.array([-999, -999]) # Current position in global map
         self.waypoints = np.array([[-999, -999]]) # Path to destination
 
@@ -303,21 +303,21 @@ class Task(Node):
 
                 if self.check_heading(target_heading):
                     if self.path[self.i] == [0, 0]: #Task 1b, if marker not found
-                        loc_buoy = (0, len(self.map))
-                        loc_marker = (0, len(self.map))
+                        loc_buoy = (0, 0, len(self.map))
+                        loc_marker = (0, 0, len(self.map))
 
                         for i in range(len(self.image_objects)): #Search for closest object of each type
-                            if self.image_objects[i] == (RED or GREEN) and self.locations[i][1] < loc_buoy[1]:
+                            if self.image_objects[i] == (RED or GREEN) and self.locations[i][2] < loc_buoy[2]:
                                 loc_buoy = self.locations[i]
-                            elif self.image_objects[i] == EAST and self.locations[i][1] < loc_marker[1]:
+                            elif self.image_objects[i] == EAST and self.locations[i][2] < loc_marker[2]:
                                 loc_marker = self.locations[i]
                                 dist = 3
-                            elif self.image_objects[i] == WEST and self.locations[i][1] < loc_marker[1]:
+                            elif self.image_objects[i] == WEST and self.locations[i][2] < loc_marker[2]:
                                 loc_marker = self.locations[i]
                                 dist = -3
                         
                         if dist != 0: #If marker was detected
-                            coord = self.get_coordinate(loc_buoy[0], loc_buoy[1] + dist)[0]
+                            coord = self.get_coordinate(loc_buoy[0], loc_buoy[1] + dist)[0] #FIX
                             self.path[self.i] = coord
 
                     self.stage = 10
@@ -345,18 +345,18 @@ class Task(Node):
                             break
 
                     #check x position of otter
-                    if self.locations[index][0] < self.local_w * margin:
+                    if self.locations[index][0] < self.local_l * margin:
                         self.stage = 20
-                    elif self.location[index][0] > self.local_w * (1 - margin):
+                    elif self.location[index][0] > self.local_l * (1 - margin):
                         self.stage = 12
                     else:
                         loc_buoy = (0, len(self.map))
 
                         for i in range(len(self.image_objects)): #Search for closest object of each type
-                            if self.image_objects[i] == RED and self.locations[i][1] < loc_buoy[1]:
+                            if self.image_objects[i] == RED and self.locations[i][2] < loc_buoy[2]:
                                 loc_buoy = self.locations[i]
                         
-                        coord = self.get_coordinate(loc_buoy[0], loc_buoy[1] + 3)[0]
+                        coord = self.get_coordinate(loc_buoy[0], loc_buoy[1] + 3)[0] #FIX
                         self.path.insert(coord, 1)
 
                         self.stage = 11
@@ -398,7 +398,7 @@ class Task(Node):
             while not (self.object_data_ready_event.is_set() # True if new data received
                        and self.phone_data_ready_event.is_set() # True if new data received
                        and self.position_data_ready_event.is_set() # True if new data received
-                       and GPIO.input(self.rc_pin) # True if boat in RC mode
+                       and not GPIO.input(self.auto_pin) # True if boat in RC mode
                        and GPIO.input(self.estop_pin)): # True if estop on
                 rclpy.spin_once(self, timeout_sec = 0.1)
 
@@ -427,7 +427,7 @@ class Task(Node):
         # position alongside it for the stage logic that reasons about location.
         self.get_logger().info(f"Objects: {msg.objects}")
         self.objects = [obj.label_id for obj in msg.objects]
-        self.locations = [[obj.position[1], obj.position[0]] for obj in msg.objects]
+        self.locations = [[obj.position.x, obj.position.y, obj.position.z] for obj in msg.objects]
         self.object_data_ready_event.set()
         # Keep the legacy event set so the task loop can proceed without the
         # removed locations topic.
