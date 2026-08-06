@@ -40,7 +40,6 @@ from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
 
-
 class MotorNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
 
@@ -74,7 +73,7 @@ class MotorNode(Node):
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('max', 45.0)
-
+        
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
         self.center = self.get_parameter('center').value
@@ -88,10 +87,11 @@ class MotorNode(Node):
         self.ki    = self.get_parameter('ki').value
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
-
+        
         # ---- Hardware bring-up (same sequence as motor.py) ----
         self._init_busio(freq)
         self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
+        self._init_led()
 
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
         self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
@@ -176,11 +176,17 @@ class MotorNode(Node):
             self.prop_l = servo.Servo(self.pca.channels[0], min_pulse=prop_min, max_pulse=prop_max)
             self.prop_r = servo.Servo(self.pca.channels[1], min_pulse=prop_min, max_pulse=prop_max)
             self.rudder = servo.Servo(self.pca.channels[2], min_pulse=rudder_min, max_pulse=rudder_max)
+            self.red = self.pca.channels[3]
+            self.green = self.pca.channels[4]
         except Exception as e:
             self.get_logger().error(f"Failed to initialize servo channels: {e}")
             raise
 
         self.get_logger().info("Servo PWM channels initialized (ch0 prop_l, ch1 prop_r, ch2 rudder).")
+
+    def _init_led(self):
+        self.red.duty_cycle = 0xFFFF
+        self.green.duty_cycle = 0xFFFF
 
     def publish_battery_raw(self) -> None:
         """Publish the three INA3221 bus voltages [dwL, dwR, br], unconverted.

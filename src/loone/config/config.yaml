@@ -1,29 +1,19 @@
 # Configurations
-/task:
+/task_logic_Njord:
   ros_parameters:
     local_l: 20
     res: 0.5
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
-    timer_period: 0.25 # Timer period for the task node in seconds
+    rc_pin: 7
+    estop_pin: 7
 
 /phone:
   ros_parameters:
     phone_port: 5000 # Port on the phone to route to the computer
     computer_port: 5000 # Port on the computer to route to the phone
     host: "127.0.0.1" # Host for the phone node (default is localhost)
-
-/path:
-  ros_parameters:
-    path_file: "path.txt" # Path to the file containing the path coordinates
-
-/led:
-  ros_parameters:
-    red_pin: 15   # GPIO board pin for red channel
-    green_pin: 32 # GPIO board pin for green channel
-    blue_pin: 33  # GPIO board pin for blue channel
-    data_pin: 7   # GPIO board pin for data input
 
 /mapping:
   ros_parameters:
@@ -52,6 +42,8 @@
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
 
+/battery_node:
+  ros_parameters:
     dw_min: 15        # Min voltage of Dewalt battery
     dw_max: 21        # Max voltage of Dewalt battery
     br_min: 13.2      # Min voltage of Blue Robotics battery

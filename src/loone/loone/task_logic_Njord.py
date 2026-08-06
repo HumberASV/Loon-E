@@ -7,6 +7,7 @@ import threading
 import numpy as np
 import time
 import math
+import RPi.GPIO as GPIO
 
 #Fill with object IDs from model
 GREEN = 0
@@ -59,14 +60,23 @@ class Task(Node):
         self.declare_parameter('task', [])
         self.declare_parameter('latitude', [])
         self.declare_parameter('longitude', [])
+        self.declare_parameter('rc_pin', 7)
+        self.declare_parameter('estop_pin', 7)
 
         # Retrieve Parameters
         self.local_w = self.get_parameter('local_w').value
         self.res = self.get_parameter('res').value
         self.task = self.get_parameter('task').integer_array_value
+
         latitude = self.get_parameter('latitude').double_array_value
         longitude = self.get_parameter('longitude').double_array_value
         self.get_path(latitude, longitude) # Merge lists
+
+        self.rc_pin = self.get_parameter('rc_pin').value
+        self.estop_pin = self.get_parameter('estop_pin').value
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(self.rc_pin, GPIO.IN)
+        GPIO.setup(self.estop_pin, GPIO.IN)
 
         #Other internal variables
         self.i = 0 # Current target GPS coordinate
@@ -385,9 +395,11 @@ class Task(Node):
         """Wait to receive data, execute task when data received, and clear event status when task executed"""
         while True:
             #Spin until data is received
-            while not (self.object_data_ready_event.is_set()
-                       and self.phone_data_ready_event.is_set()
-                       and self.position_data_ready_event.is_set()):
+            while not (self.object_data_ready_event.is_set() # True if new data received
+                       and self.phone_data_ready_event.is_set() # True if new data received
+                       and self.position_data_ready_event.is_set() # True if new data received
+                       and GPIO.input(self.rc_pin) # True if boat in RC mode
+                       and GPIO.input(self.estop_pin)): # True if estop on
                 rclpy.spin_once(self, timeout_sec = 0.1)
 
             match self.task:
@@ -397,7 +409,7 @@ class Task(Node):
                 case 3: self.task_3()
                 case 4: self.task_4()
             
-            #Clear to wait until next set of data is received - Is this necessary?
+            #Clear to wait until next set of data is received - May cause problem
             self.object_data_ready_event.clear()
             self.location_data_ready_event.clear()
             self.phone_data_ready_event.clear()

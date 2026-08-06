@@ -293,7 +293,7 @@ class Path(Node):
 
     def task_callback(self, msg: Polygon) -> None:
         """ Callback function for the task subscription. Updates the start and end positions. """
-        # Polygon messages expose their coordinates through points, not data.
+        # Polygon messages expose their coordinates through points, not raw data.
         self.get_logger().info(f"Task: {msg.points}")
         self.y_start = msg.points[0].y
         self.x_start = msg.points[0].x
