@@ -7,7 +7,7 @@ import threading
 import numpy as np
 import time
 import math
-import RPi.GPIO as GPIO
+import Jetson.GPIO as GPIO
 
 #Fill with object IDs from model
 GREEN = 0
@@ -60,8 +60,8 @@ class Task(Node):
         self.declare_parameter('task', [])
         self.declare_parameter('latitude', [])
         self.declare_parameter('longitude', [])
-        self.declare_parameter('auto_pin', 32)
-        self.declare_parameter('estop_pin', 33)
+        self.declare_parameter('auto_pin', "PG.06")
+        self.declare_parameter('estop_pin', "PH.00")
 
         # Retrieve Parameters
         self.local_l = self.get_parameter('local_l').value
@@ -74,7 +74,6 @@ class Task(Node):
 
         self.auto_pin = self.get_parameter('auto_pin').value
         self.estop_pin = self.get_parameter('estop_pin').value
-        GPIO.setmode(GPIO.BOARD)
         GPIO.setup(self.auto_pin, GPIO.IN)
         GPIO.setup(self.estop_pin, GPIO.IN)
 
@@ -283,6 +282,7 @@ class Task(Node):
         """Stops motor at end of task or if KeyboardInterrupt"""
         data = [0.0, np.nan, np.nan, np.nan]
         self.publish_motor(data)
+        GPIO.cleanup()
     
     #General Code - Tasks
     def task_0(self):

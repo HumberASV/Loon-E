@@ -39,7 +39,7 @@ import board
 from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
-import RPi.GPIO as GPIO
+import Jetson.GPIO as GPIO
 
 class MotorNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
@@ -74,8 +74,8 @@ class MotorNode(Node):
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('max', 45.0)
-        self.declare_parameter('auto_pin', 32)
-        self.declare_parameter('estop_pin', 33)
+        self.declare_parameter('auto_pin', "PG.06")
+        self.declare_parameter('estop_pin', "PH.00")
         
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
@@ -432,6 +432,7 @@ class MotorNode(Node):
             self._apply(dict(self.joint_neutral))
         finally:
             self.pca.deinit()
+            GPIO.cleanup()
 
 
 def main(args=None) -> None:

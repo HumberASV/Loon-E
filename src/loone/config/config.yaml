@@ -6,8 +6,8 @@
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
-    auto_pin: 32
-    estop_pin: 33
+    auto_pin: "PG.06"
+    estop_pin: "PH.00"
 
 /phone:
   ros_parameters:
