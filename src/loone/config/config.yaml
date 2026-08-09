@@ -1,11 +1,10 @@
 # Configurations
 /task:
   ros_parameters:
-    local_l: 20
-    res: 0.5
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
+    camera_fov: 20 # Expected horizontal distance visible in camera frame
     
 /phone:
   ros_parameters:
@@ -36,3 +35,4 @@
     dw_max: 21        # Max voltage of Dewalt battery
     br_min: 13.2      # Min voltage of Blue Robotics battery
     br_max: 16.8      # Max voltage of Blue Robotics battery
+    'use_sim_time': use_sim_times
