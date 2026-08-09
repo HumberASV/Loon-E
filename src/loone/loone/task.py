@@ -206,7 +206,7 @@ class Task(Node):
             d_heading += 360
 
         if abs(d_heading) > 45:
-            data = [2.0, -999.0, -999.0, np.sign(d_heading)]
+            data = [2.0, -999.0, np.sign(d_heading)]
             self.publish_motor(data)
             good_heading = False
             
@@ -274,18 +274,18 @@ class Task(Node):
         #Send command to Motor Node
         if self.waypoints != []:
             target_heading = self.get_coordinate(self.position, self.waypoints)[1]
-            data = [1.0, target_heading, 2.0, -999.0]
+            data = [1.0, target_heading, -999.0]
             self.publish_motor(data)
 
     def shutdown(self):
         """Stops motor at end of task or if KeyboardInterrupt"""
-        data = [0.0, np.nan, np.nan, np.nan]
+        data = [0.0, -999.0, -999.0]
         self.publish_motor(data)
     
     #General Code - Tasks
     def task_0(self):
         """For PID testing"""
-        data = [1.0, 170.0, 5.0, -999.0]
+        data = [1.0, 170.0, -999.0]
         self.publish_motor(data)
     
     def task_1(self):
@@ -369,7 +369,7 @@ class Task(Node):
                     self.stage = 20
 
             case 12: #If right of boat, wait until Otter passes
-                data = [0.0, -999.0, -999.0, -999.0]
+                data = [0.0, -999.0, -999.0]
                 self.publish_motor(data)
                 
                 if self.check_change(OTTER, False):

@@ -349,15 +349,6 @@ class MotorNode(Node):
             # is within the valid range for the propellers ?
             remapped_output = self.remap(output)
 
-            if self.current_speed < self.target_speed:
-                self.factor += 0.05
-                if self.factor > 1:
-                    self.factor = 1
-            elif self.current_speed > self.target_speed:
-                self.factor -= 0.05
-                if self.factor < 0.55:
-                    self.factor = 0.55
-
             if current_error > 0:  # turn right: reduce right propeller
                 self.prop_l.fraction = self.factor
                 self.prop_r.fraction = self.get_fraction(remapped_output) * self.factor
@@ -428,8 +419,7 @@ class MotorNode(Node):
         self.get_logger().info(f"Task: {msg.data}")
         self.command = data[0]
         self.target_heading = data[1]
-        self.target_speed = data[2]
-        self.dir = data[3]
+        self.dir = data[2]
         self.check_data()
         self.task_data_ready_event.set() # Unblocks the init sequence
 
