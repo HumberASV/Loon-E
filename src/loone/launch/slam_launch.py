@@ -96,6 +96,7 @@ def generate_launch_description():
             'slam_params_file': slam_params_file,
             'use_sim_time': use_sim_time,
         }.items()
+
     )
 
     return LaunchDescription([

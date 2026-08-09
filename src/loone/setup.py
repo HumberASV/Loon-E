@@ -34,22 +34,9 @@ setup(
         'console_scripts': [
             'phone = loone.phone:main',
             'task = loone.task:main',
-            'mapping = loone.mapping:main',
             'path_planning = loone.path_planning:main',
             'motor = loone.motor:main',
-            # nav2 + ros2_control chain (see bringup.launch.py)
-            'thrust_mixer = loone.thrust_mixer:main',
-            'busio_node = loone.busio_node:main',
             'battery_node = loone.battery_node:main',
-            # Task 1: GPS point list -> nav2 follow_waypoints (see task1.launch.py)
-            'gps_waypoint_mission = loone.gps_waypoint_mission:main',
-            # Simulation only: stands in for busio_node's open-loop state echo
-            # when the real driver is not running (see sim_state_echo.py).
-            'sim_state_echo = loone.sim_state_echo:main',
-            # Bench-test utilities (see spin.launch.py / motor_test.launch.py / forward.launch.py).
-            'spin_node = loone.spin_node:main',
-            'motor_test_node = loone.motor_test_node:main',
-            'forward_node = loone.forward_node:main',
         ],
     },
 )

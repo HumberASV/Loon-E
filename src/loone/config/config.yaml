@@ -1,49 +1,34 @@
 # Configurations
-/task_logic_Njord:
+/task:
   ros_parameters:
     local_l: 20
     res: 0.5
     task: [0] # List of tasks to be performed
     latitude: [] # List of GPS latitudes
     longitude: [] # List of GPS longitudes
-    auto_pin: "PG.06"
-    estop_pin: "PH.00"
-
+    
 /phone:
   ros_parameters:
     phone_port: 5000 # Port on the phone to route to the computer
     computer_port: 5000 # Port on the computer to route to the phone
     host: "127.0.0.1" # Host for the phone node (default is localhost)
 
-/mapping:
-  ros_parameters:
-    local_w: 20       # Local map width in meters
-    local_l: 20       # Local map length in meters
-    global_w: 50      # Global map width in meters
-    global_l: 50      # Global map length in meters
-    res: 0.5          # Map resolution in meters per cell
-    start_position: 4 # Starting quadrant/position (0.5–4, see mapping.py)
-    map_frame: "gps_map" # Frame_id for the GPS/object-detection-based global map and position, kept distinct from the SLAM Toolbox "map" frame
-
 /motor:
   ros_parameters:
-    timer_period: 0.25 # Timer period in seconds
+    timer_period: 0.5 # Timer period in seconds
     freq: 50          # PCA9685 PWM frequency in Hz
     factor: 0.75      # Initial propeller throttle factor
-    center: 0.55      # Rudder center fraction (0 degrees)
+    center: 0.5      # Rudder center fraction (0 degrees)
 
-    kp: 1.0           # PID proportional gain
-    ki: 0.0           # PID integral gain
-    kd: 0.0           # PID derivative gain
+    kp: 2.0           # PID proportional gain
+    ki: 0.5           # PID integral gain
+    kd: 0.02           # PID derivative gain
     max: 45.0         # Max heading error / PID output clamp (degrees)
 
     prop_min: 1120    # Propeller servo min pulse width (µs)
     prop_max: 1880    # Propeller servo max pulse width (µs)
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
-
-    auto_pin: 32
-    estop_pin: 33
 
 /battery_node:
   ros_parameters:

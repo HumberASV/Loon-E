@@ -36,10 +36,10 @@ import numpy as np
 import time
 import busio
 import board
+import digitalio
 from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
-import Jetson.GPIO as GPIO
 
 class MotorNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
@@ -61,21 +61,19 @@ class MotorNode(Node):
         self.task_data_ready_event = threading.Event()
 
         # ---- Parameters (defaults mirror config.yaml /motor block and motor.py) ----
-        self.declare_parameter('timer_period', 0.25) # Timer period to publish raw battery voltages
+        self.declare_parameter('timer_period', 0.5) # Timer period to publish raw battery voltages
         self.declare_parameter('freq', 50)          # PCA9685 PWM frequency (Hz)
         self.declare_parameter('factor', 0.75)      # Starting speed
         self.declare_parameter('prop_min', 1120)    # propeller servo min pulse (us)
         self.declare_parameter('prop_max', 1880)    # propeller servo max pulse (us)
         self.declare_parameter('rudder_min', 1220)  # rudder servo min pulse (us)
         self.declare_parameter('rudder_max', 1820)  # rudder servo max pulse (us)
-        self.declare_parameter('prop_neutral', 0.5)   # propeller fraction = no thrust
-        self.declare_parameter('rudder_center', 0.55)  # rudder fraction = straight
+        self.declare_parameter('center', 0.5)   # propeller fraction = no thrust
         self.declare_parameter('kp', 1.0)
         self.declare_parameter('ki', 0.0)
         self.declare_parameter('kd', 0.0)
         self.declare_parameter('max', 45.0)
-        self.declare_parameter('auto_pin', "PG.06")
-        self.declare_parameter('estop_pin', "PH.00")
+        self.declare_parameter('diff', 0.05)
         
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
@@ -83,14 +81,12 @@ class MotorNode(Node):
         prop_max = self.get_parameter('prop_max').value
         rudder_min = self.get_parameter('rudder_min').value
         rudder_max = self.get_parameter('rudder_max').value
-        self.prop_neutral = self.get_parameter('prop_neutral').value
-        self.center = self.get_parameter('rudder_center').value
+        self.center = self.get_parameter('center').value
         self.kp    = self.get_parameter('kp').value
         self.ki    = self.get_parameter('ki').value
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
-        self.auto_pin = self.get_parameter('auto_pin').value
-        self.estop_pin = self.get_parameter('estop_pin').value
+        self.diff = self.get_parameter('diff').value
         
         # ---- Hardware bring-up (same sequence as motor.py) ----
         self._init_busio(freq)
@@ -117,6 +113,7 @@ class MotorNode(Node):
         self.target_heading = np.nan
         self.target_speed = np.nan
         self.dir = np.nan
+        self.led_state = True
 
         # Spin until data is received
         self.get_logger().info('waiting for phone and task data...')
@@ -180,7 +177,7 @@ class MotorNode(Node):
         try:
             self.prop_l = servo.Servo(self.pca.channels[0], min_pulse=prop_min, max_pulse=prop_max)
             self.prop_r = servo.Servo(self.pca.channels[1], min_pulse=prop_min, max_pulse=prop_max)
-            self.rudder = servo.Servo(self.pca.channels[2], min_pulse=rudder_min, max_pulse=rudder_max)
+            #self.rudder = servo.Servo(self.pca.channels[2], min_pulse=rudder_min, max_pulse=rudder_max)
             self.red = self.pca.channels[4]
             self.green = self.pca.channels[5]
         except Exception as e:
@@ -190,9 +187,10 @@ class MotorNode(Node):
         self.get_logger().info("Servo PWM channels initialized (ch0 prop_l, ch1 prop_r, ch2 rudder).")
 
     def _init_led(self):
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(self.auto_pin, GPIO.IN)
-        GPIO.setup(self.estop_pin, GPIO.IN)
+        self.auto_pin = digitalio.DigitalInOut(board.D12)
+        self.auto_pin.direction = digitalio.Direction.INPUT
+        self.estop_pin = digitalio.DigitalInOut(board.D13)
+        self.estop_pin.direction = digitalio.Direction.INPUT
         
     def publish_battery_raw(self) -> None:
         """Publish the three INA3221 bus voltages [dwL, dwR, br], unconverted.
@@ -213,13 +211,22 @@ class MotorNode(Node):
         self.battery_raw_pub.publish(msg)
 
     def set_led(self):
-        self.red.duty_cycle = 0xFFFF
-        self.green.duty_cycle = 0xFFFF
+        match self.led_state:
+            case True:
+                self.red.duty_cycle = 0x7FFF
+                self.green.duty_cycle = 0x7FFF
 
-        if GPIO.input(self.estop_pin):
-            self.green.duty_cycle = 0x0000
-        elif GPIO.input(self.auto_pin):
-            self.red.duty_cycle = 0x0000
+                if not self.estop_pin.value:
+                    self.green.duty_cycle = 0x0000
+                elif self.auto_pin.value:
+                    self.red.duty_cycle = 0x0000
+
+                self.led_state = False
+
+            case False:
+                self.red.duty_cycle = 0x0000
+                self.green.duty_cycle = 0x0000
+                self.led_state = True
 
     def publish_motor(self) -> None:
         # Publish the current motor state
@@ -294,34 +301,34 @@ class MotorNode(Node):
         """Set PWM to move backwards"""
         self.prop_l.fraction = 0 #max backward
         self.prop_r.fraction = 0 #max backward
-        self.rudder.fraction = self.center #0 degrees
+        #self.rudder.fraction = self.center #0 degrees
         self.publish_motor()
     
     def stop(self) -> None:
         """Set propeller and rudder PWM to center/no motion"""
         self.prop_l.fraction = 0.5 #no motion
         self.prop_r.fraction = 0.5 #no motion
-        self.rudder.fraction = self.center #0 degrees
+        #self.rudder.fraction = self.center #0 degrees
         self.publish_motor()
 
     def turn_in_place(self) -> None:
         """Set PWM to turn in place"""
-        if np.sign(self.dir) == 1: #turn left
-            self.prop_l.fraction = self.get_fraction(1460) #min backward
-            self.prop_r.fraction = self.get_fraction(1540) #min forward 
-            self.rudder.fraction = self.center #0 degrees
+        if self.dir == 1: #turn left
+            self.prop_l.fraction = self.center - self.diff # backward
+            self.prop_r.fraction = self.center + self.diff # forward 
+            #self.rudder.fraction = self.center #0 degrees
         
         else: #turn right
-            self.prop_l.fraction = self.get_fraction(1540) #min forward
-            self.prop_r.fraction = self.get_fraction(1460) #min backward 
-            self.rudder.fraction = self.center #0 degrees
+            self.prop_l.fraction = self.center + self.diff # forward
+            self.prop_r.fraction = self.center - self.diff # backward 
+            #self.rudder.fraction = self.center #0 degrees
         
         self.publish_motor()
 
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()        
-        current_error = self.target_heading - self.convert(self.current_heading)
+        current_error = self.convert(self.target_heading - self.convert(self.current_heading))
         dt = current_time - self.last_time
         de = (current_error - self.last_error) / dt
 
@@ -359,14 +366,14 @@ class MotorNode(Node):
                 self.prop_l.fraction = self.get_fraction(remapped_output) * self.factor
                 self.prop_r.fraction = self.factor
                 self.get_logger().info(f"Sending Left: {remapped_output}")
-
+            '''
             if output < -self.max / 2:
                 self.rudder.fraction = 0.0    # 35° right
             elif output > self.max / 2:
                 self.rudder.fraction = 1.0    # 35° left
             else:
                 self.rudder.fraction = self.center  # centred
-                
+            '''    
             self.last_error = current_error
             self.last_time = current_time
             self.publish_motor()
