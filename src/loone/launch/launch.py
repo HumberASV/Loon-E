@@ -20,6 +20,11 @@ def generate_launch_description():
      
     loone_share = get_package_share_directory('loone')
 
+    # Node parameters. Nothing previously passed this file to task/motor/
+    # path_planning, so every tuned value in it was ignored and the in-code
+    # defaults were used instead.
+    config = os.path.join(loone_share, 'config', 'config.yaml')
+
     # Robot description lives in the le1000_urdf_t4 package (src/loone_urdf --
     # the directory name and the package name differ).
     urdf_share = get_package_share_directory('le1000_urdf_t4')
@@ -53,6 +58,7 @@ def generate_launch_description():
             executable='phone',
             name='phone',
             output='screen',
+            parameters=[config],
             condition=UnlessCondition(sim),
         )
 
@@ -61,7 +67,7 @@ def generate_launch_description():
             executable='battery_node',
             name='battery_node',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[config, {'use_sim_time': use_sim_time}],
             condition=UnlessCondition(sim),
         )
 
@@ -115,22 +121,31 @@ def generate_launch_description():
         ],
     )
 
+    # The name= values must match the top-level keys in config.yaml (/task,
+    # /motor, /path_planning) for the parameters to be applied.
     task = Node(
         package='loone',
         executable='task',
         name='task',
+        output='screen',
+        parameters=[config, {'use_sim_time': use_sim_time}],
     )
 
     motor =  Node(
         package='loone',
         executable='motor',
         name='motor',
+        output='screen',
+        parameters=[config, {'use_sim_time': use_sim_time}],
+        condition=UnlessCondition(sim),
     )
 
     path_planning = Node(
         package='loone',
         executable='path_planning',
         name='path_planning',
+        output='screen',
+        parameters=[config, {'use_sim_time': use_sim_time}],
     )
 
     # list of above inorder of importance

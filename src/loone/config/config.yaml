@@ -1,11 +1,24 @@
 # Configurations
 /task:
   ros_parameters:
-    task: [0] # List of tasks to be performed
-    latitude: [] # List of GPS latitudes
-    longitude: [] # List of GPS longitudes
-    camera_fov: 40 # Expected horizontal distance visible in camera frame
-    
+    # Task to run. Scalar, not a list: a list never matched the dispatch in
+    # task.py. 31 = task 3a (forward docking), 32 = task 3b (parallel docking),
+    # because mixing a float into an int list changes the parameter's type.
+    task: 1
+    # GPS course, one entry per waypoint. These must be the same length and
+    # non-empty -- task.py raises at startup otherwise.
+    latitude: [63.4420522, 63.442353, 63.4424279]
+    longitude: [10.4239289, 10.4237452, 10.4243540]
+    camera_fov: 40.0 # Expected horizontal distance visible in camera frame, metres
+    # ZED object detection topic; follows the camera_name/zed_node_name launch args.
+    objects_topic: "/zedx/zed_node/obj_det/objects"
+    # SAFETY: sense of the switch inputs on board.D12 / D13. Defaults follow
+    # motor.py's LED logic (engaged / clear = line high). VERIFY ON THE BENCH
+    # and flip these here if the boat arms in the wrong switch position.
+    auto_active_high: true
+    estop_clear_high: true
+
+
 /phone:
   ros_parameters:
     phone_port: 5000 # Port on the phone to route to the computer
