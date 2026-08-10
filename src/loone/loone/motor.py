@@ -235,9 +235,9 @@ class MotorNode(Node):
                 self.red.duty_cycle = 0x7FFF
                 self.green.duty_cycle = 0x7FFF
 
-                if not self.estop_pin.value:
+                if not self.estop_pin.value: # Estop pressed
                     self.green.duty_cycle = 0x0000
-                elif self.auto_pin.value:
+                elif self.auto_pin.value: # Auto
                     self.red.duty_cycle = 0x0000
 
                 self.led_state = False
@@ -456,15 +456,11 @@ class MotorNode(Node):
 
     def shutdown(self) -> None:
         """Return channels to neutral and release the PCA9685 on node shutdown."""
-        # _apply() and joint_neutral do not exist on this class -- the old body
-        # raised AttributeError on every shutdown, so the propellers were never
-        # commanded to neutral before deinit. stop() is the real neutral call.
-        try:
-            self.stop()
-        except Exception as e:
-            self.get_logger().error(f"Failed to neutralize motors on shutdown: {e}")
-        finally:
-            self.pca.deinit()
+        self.red.duty_cycle = 0x0000
+        self.green.duty_cycle = 0x0000
+        self.stop()
+        time.sleep(1)
+        self.pca.deinit()
 
 def main(args=None) -> None:
     """Initialize the ROS2 node and spin."""

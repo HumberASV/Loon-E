@@ -37,7 +37,10 @@ from std_msgs.msg import Float32MultiArray, Int8MultiArray
 from geometry_msgs.msg import Polygon, Point32, PoseWithCovarianceStamped
 from nav_msgs.msg import OccupancyGrid
 from zed_msgs.msg import ObjectsStamped
-
+import threading
+import numpy as np
+import time
+import math
 
 class Task(Node):
     """Runs the selected competition task as a stage-based state machine."""
@@ -77,91 +80,53 @@ class Task(Node):
         self.position_data_ready_event = threading.Event()
         self.map_data_ready_event = threading.Event()
         self.path_data_ready_event = threading.Event()
-        # Set once on shutdown so the worker thread can exit promptly.
-        self.stop_event = threading.Event()
 
-        # Declare parameters with fallback/default values
-        # `task` is a scalar, not a list: the old [1] default meant the dispatch
-        # `match` compared a list against ints and never matched any case, so
-        # run_task looped forever doing nothing. 31/32 encode tasks 3a/3b,
-        # because a float in an int list changes the whole parameter's type.
-        self.declare_parameter('task', 1)
+        #Publishers and Subscribers
+        self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
+        self.motor_pub = self.create_publisher(Float32MultiArray, 'task_motor', 10)
+        # ZED now provides both object IDs and object positions, so the task
+        # node no longer needs the separate locations topic.
+        self.objects_sub = self.create_subscription(ObjectsStamped, '/zedx/zed_node/obj_det/objects', self.object_callback, 10)
+        self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
+        self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
+        self.position_sub = self.create_subscription(PoseStamped, '/pose', self.position_callback, 10)
+        self.path_sub = self.create_subscription(Polygon, 'path', self.path_callback, 10)
+        
+        #Declare parameters with fallback/default values
+        self.declare_parameter('task', [1.1])
         self.declare_parameter('latitude', [63.4420522, 63.442353, 63.4424279])
         self.declare_parameter('longitude', [10.4239289, 10.4237452, 10.4243540])
-        self.declare_parameter('camera_fov', 40.0)
-        # The ZED topic embeds the camera_name/zed_node_name launch arguments,
-        # so it has to be configurable rather than hard-coded.
-        self.declare_parameter('objects_topic', '/zedx/zed_node/obj_det/objects')
-        # SAFETY: the sense of the two switch inputs is set here rather than
-        # baked into the comparison, so it can be corrected from YAML after a
-        # bench test instead of needing a rebuild. Defaults follow motor.py's
-        # LED logic (auto engaged = line high, e-stop clear = line high).
-        self.declare_parameter('auto_active_high', True)
-        self.declare_parameter('estop_clear_high', True)
-
+        self.declare_parameter('camera_fov', 20)
+        self.declare_parameter('has_map', False)
+        self.declare_parameter('has_camera', False)
+        
         # Retrieve Parameters
         self.task = self.get_parameter('task').value
         latitude = self.get_parameter('latitude').value
         longitude = self.get_parameter('longitude').value
-        self.get_path(latitude, longitude)  # Merge lists
-        self.camera_fov = float(self.get_parameter('camera_fov').value)
-        objects_topic = self.get_parameter('objects_topic').value
-        self.auto_active_high = self.get_parameter('auto_active_high').value
-        self.estop_clear_high = self.get_parameter('estop_clear_high').value
+        self.get_path(latitude, longitude) # Merge lists
+        self.camera_fov = self.get_parameter('camera_fov').value
+        self.has_map = self.get_parameter('has_map').value
+        self.has_camera = self.get_parameter('has_camera').value
 
-        # Publishers and Subscribers
-        self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
-        # Was 'task_motor', which motor.py does not subscribe to -- every motor
-        # command, including the shutdown stop, went nowhere.
-        self.motor_pub = self.create_publisher(Float32MultiArray, 'task', 10)
-        # ZED provides both labels and positions, so there is no separate
-        # locations topic.
-        self.objects_sub = self.create_subscription(
-            ObjectsStamped, objects_topic, self.object_callback, 10)
-        self.phone_sub = self.create_subscription(
-            Float32MultiArray, 'phone', self.phone_callback, 10)
-        self.map_sub = self.create_subscription(
-            OccupancyGrid, '/map', self.map_callback, 10)
-        # SLAM Toolbox publishes /pose as PoseWithCovarianceStamped. Subscribing
-        # as PoseStamped meant the types never matched, no callback ever fired,
-        # and run_task blocked forever waiting for position data.
-        self.position_sub = self.create_subscription(
-            PoseWithCovarianceStamped, '/pose', self.position_callback, 10)
-        self.path_sub = self.create_subscription(
-            Polygon, 'path', self.path_callback, 10)
-        # motor.py owns board.D12/D13 and republishes their levels here. Two
-        # processes opening the same gpiochip line fails with "Device or
-        # resource busy" under libgpiod, so this node no longer touches the
-        # hardware itself.
-        self.rc_sub = self.create_subscription(
-            Int8MultiArray, 'rc_state', self.rc_callback, 10)
+        #Other internal variables
+        self.i = 0 # Current target GPS coordinate
+        self.stage = 0 # Current stage in task
 
-        # Other internal variables
-        self.i = 0                  # Index of the current target in self.path
-        self.stage = 0              # Current stage within the task
-        self.finished = False       # Set once the course is complete
-        self.gate_was_open = False  # Tracks autonomy-gate edges so we can stop
-        self.stage_deadline = None  # Non-blocking replacement for time.sleep
-        self.buoy_list = []         # Buoys already used to adjust the course
-        self.target_heading = None  # Latched heading target for the dock turns
+        #Other variables from topics
+        self.position = np.array([[-999, -999]]) # Current GPS position
+        self.heading = -999 # Current Heading
+        self.objects = [-999] # Current objects in view
+        self.locations = [[-999, -999]] # Current position of objects in [x, y, z]
+        self.res = -999
+        self.origin = np.array([-999, -999])
+        self.global_position = np.array([0, 0]) # Current position in global map
+        self.waypoints = np.array([[-999, -999]]) # Path to destination
+        self.buoy_list = []
+        self.target_heading = -999
 
-        # Other variables from topics. None means "not received yet" so the
-        # sentinel -999 values can no longer leak into the navigation maths.
-        self.position = None        # Current GPS position as [lat, lon]
-        self.heading = None         # Current heading, degrees, 0 = North
-        self.speed = None           # Current speed
-        self.detections = []        # [(label, forward_m, lateral_m), ...]
-        self.res = None             # Map resolution, metres per cell
-        self.origin = None          # Map origin as [y, x] in metres
-        self.map = None             # Occupancy grid
-        self.global_position = None # Current position as [row, col] map cells
-        self.waypoints = []         # Path to destination, as [row, col] cells
-        self.auto_engaged = False   # Autonomy switch, after polarity mapping
-        self.estop_clear = False    # E-stop switch, after polarity mapping
-        self.rc_state_time = 0.0    # monotonic timestamp of the last rc_state
-
-        # Thread
-        self.receiver = threading.Thread(target=self.run_task, daemon=True)
+        #Thread
+        self.receiver = threading.Thread(target = self.run_task, daemon = True)
         self.receiver.start()
 
     def get_path(self, latitude, longitude):
@@ -286,14 +251,14 @@ class Task(Node):
 
         Possible edit: Use haversine formula instead
         """
-        north, east = self.offset_meters(start, end)
-        # The offset is start -> end and is *added* to the current cell. The old
-        # code computed end -> start and added that, mirroring every goal
-        # through the boat's position and planning in the opposite direction.
-        row = self.global_position[0] + round(north / self.res)
-        col = self.global_position[1] + round(east / self.res)
-        return [row, col]
-
+        lat = math.radians((start[1] + end[1]) / 2)
+        y = round((start[0] - end[0]) * 111000 / self.res)
+        x = round((start[1] - end[1]) * 111000 * math.cos(lat) / self.res)
+        target_position = [self.global_position[0] + y, self.global_position[1] + x]
+        heading = math.degrees(math.atan2(x, y))
+        
+        return target_position, heading
+    
     def get_coordinate(self, current_position, waypoints):
         """Get the GPS position and compass heading of the next waypoint.
 
@@ -434,38 +399,27 @@ class Task(Node):
         return self.stage_deadline is not None and time.monotonic() >= self.stage_deadline
 
     def drive(self):
-        """Self-driving control loop."""
-        if not self.sensors_ready():
-            return
+        """Self-driving control loop"""
+        #Calculate target position in global map
+        self.get_logger().info(f"{self.position}, {self.path[i]}")
+        target_position, target_heading = self.get_map_cell(self.position, self.path[self.i])
+        self.get_logger().info(f"{target_position}, {target_heading}")
+        
+        if self.has_map:
+            data = [self.global_position, target_position]
+            self.publish_path(data)
+            
+            #Wait for path planning to be completed
+            while not self.path_data_ready_event.is_set():
+                rclpy.spin_once(self, timeout_sec = 0.1)
+            self.path_data_ready_event.clear()
 
-        # Calculate the target position in the global map
-        target_position = self.get_map_cell(self.position, self.path[self.i])
-
-        # Cleared *before* publishing: clearing afterwards let a path left over
-        # from the previous cycle satisfy the wait below.
-        self.path_data_ready_event.clear()
-        self.publish_path([self.global_position, target_position])
-
-        # Wait for path planning to complete. The old unbounded wait meant that
-        # if path_planning was down the boat coasted on its last command
-        # forever; on timeout we stop instead.
-        if not self.path_data_ready_event.wait(timeout=self.PATH_TIMEOUT_S):
-            self.get_logger().warning("No path received from path_planning; stopping.")
-            self.stop()
-            return
-
-        # Send the command to the Motor Node. get_coordinate indexes
-        # waypoints[1], so a shorter path is not usable.
-        if len(self.waypoints) >= 2:
-            target_heading = self.get_coordinate(self.position, self.waypoints)[1]
-            self.publish_motor([1.0, target_heading, -999.0])
-        else:
-            self.get_logger().warning("Path too short to steer on; stopping.")
-            self.stop()
-
-    def stop(self):
-        """Command the motors to neutral."""
-        self.publish_motor([0.0, -999.0, -999.0])
+            #Send command to Motor Node
+            if self.waypoints != []:
+                target_heading = self.get_coordinate(self.position, self.waypoints)[1]
+    
+        data = [1.0, target_heading, -999.0]
+        self.publish_motor(data)
 
     def shutdown(self):
         """Stops the motors at the end of the task or on KeyboardInterrupt."""
@@ -476,14 +430,23 @@ class Task(Node):
     # General Code - Tasks
     def task_0(self):
         """For PID testing"""
-        self.publish_motor([1.0, 170.0, -999.0])
+        data = [1.0, 170.0, -999.0]
+        self.publish_motor(data)
+    
+    def task_1a(self):
+        """Maneuvering"""
+        self.get_logger().info("Ready!")
+        match self.stage:
+            case 0: #Drive
+                self.drive()
 
-    def task_1(self):
-        """Maneuvering and Path Finding.
+                if self.arrived(self.i):
+                    self.i += 1
+                    if self.i == len(self.path): #Final waypoint
+                        self.shutdown()
 
-        Follows the GPS course, nudging the current waypoint sideways so the
-        boat passes on the correct side of any red or green gate buoy.
-        """
+    def task_1b(self):
+        """Path Finding"""
         match self.stage:
             case 0:  # Drive
                 self.drive()
@@ -659,74 +622,35 @@ class Task(Node):
         """Surprise Task"""
         return
 
-    # General Code - Main loop
-    def gate_open(self):
-        """True when the boat is in autonomous mode with the e-stop clear.
-
-        Fails closed if motor.py has not reported recently, so losing the node
-        that owns the switches stops the boat rather than leaving it running
-        blind.
-        """
-        if time.monotonic() - self.rc_state_time > self.RC_STATE_TIMEOUT_S:
-            return False
-
-        return self.auto_engaged and self.estop_clear
-
-    def wait_for_data(self):
-        """Block until fresh sensor data is available and the boat is armed.
-
-        Returns False if the node is shutting down.
-        """
-        while not self.stop_event.is_set():
-            if not self.gate_open():
-                # SAFETY: the old loop simply stopped iterating when the gate
-                # closed, which left the last drive command latched in the
-                # motor node. Command a stop on the closing edge instead.
-                if self.gate_was_open:
-                    self.get_logger().warning("Autonomy gate closed - stopping motors.")
-                    self.stop()
-                    self.gate_was_open = False
-
-                self.stop_event.wait(0.05)
-                continue
-
-            if (self.object_data_ready_event.is_set()
-                    and self.phone_data_ready_event.is_set()
-                    and self.position_data_ready_event.is_set()):
-                self.gate_was_open = True
-                return True
-
-            # Waiting on the stop event rather than sleeping keeps shutdown
-            # responsive. This thread must not spin the executor: main() does.
-            self.stop_event.wait(0.02)
-
-        return False
+    def ready(self):
+        ready = True
+        if self.has_map and not self.position_data_ready_event.is_set():
+            ready = False
+        
+        if self.has_camera and not self.object_data_ready_event.is_set():
+            ready = False
+        
+        return ready 
 
     def run_task(self):
-        """Wait for data, execute one pass of the task, then clear the events."""
-        while not self.stop_event.is_set():
-            if not self.wait_for_data():
-                return
-
-            if self.finished:
-                return
-
-            self.get_logger().debug("Ready!")
-
-            # self.task is a scalar int; 31/32 stand in for tasks 3a/3b.
-            match self.task:
-                case 0: self.task_0()
-                case 1: self.task_1()
-                case 2: self.task_2()
-                case 31: self.task_3a()
-                case 32: self.task_3b()
-                case 4: self.task_4()
-                case _:
-                    self.get_logger().error(f"Unknown task {self.task}; stopping.")
-                    self.shutdown()
-                    return
-
-            # Clear to wait until the next set of data is received
+        """Wait to receive data, execute task when data received, and clear event status when task executed"""
+        while True:
+            #Spin until data is received
+            '''
+            while not self.ready():
+                rclpy.spin_once(self, timeout_sec = 0.1)
+            '''
+            self.get_logger().info(f"bingus Run task function {self.task[0]}")
+            match self.task[0]:
+                case 0.0: self.task_0()
+                case 1.1: self.task_1a()
+                case 1.2: self.task_1b()
+                case 2.0: self.task_2()
+                case 3.1: self.task_3a()
+                case 3.2: self.task_3b()
+                case 4.0: self.task_4()
+            
+            #Clear to wait until next set of data is received - May cause problem
             self.object_data_ready_event.clear()
             self.phone_data_ready_event.clear()
             self.position_data_ready_event.clear()
