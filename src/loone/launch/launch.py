@@ -16,7 +16,6 @@ def generate_launch_description():
     zed_node_name = LaunchConfiguration('zed_node_name')
     use_sim_time = LaunchConfiguration('use_sim_time')
     sim = LaunchConfiguration('sim')
-    config_path = os.path.join(get_package_share_directory('loone'), 'config', 'config.yaml')
      
     loone_share = get_package_share_directory('loone')
     # gps_waypoints_json = LaunchConfiguration('gps_waypoints_json')
@@ -44,7 +43,6 @@ def generate_launch_description():
             name='phone',
             output='screen',
             condition=UnlessCondition(sim),
-            parameters=[config_path]
         )
 
     battery_node = Node(
@@ -52,7 +50,7 @@ def generate_launch_description():
             executable='battery_node',
             name='battery_node',
             output='screen',
-            parameters=[config_path],
+            parameters=[{'use_sim_time': use_sim_time}],
             condition=UnlessCondition(sim),
         )
 
@@ -78,21 +76,18 @@ def generate_launch_description():
         package='loone',
         executable='task',
         name='task',
-        parameters=[config_path],
     )
 
     motor =  Node(
         package='loone',
         executable='motor',
         name='motor',
-        parameters=[config_path],
     )
 
     path_planning = Node(
         package='loone',
         executable='path_planning',
         name='path_planning',
-        parameters=[config_path],
     )
 
     # list of above inorder of importance
