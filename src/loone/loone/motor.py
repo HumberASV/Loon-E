@@ -439,7 +439,6 @@ class MotorNode(Node):
         finally:
             self.pca.deinit()
 
-
 def main(args=None) -> None:
     """Initialize the ROS2 node and spin."""
     rclpy.init(args=args)
