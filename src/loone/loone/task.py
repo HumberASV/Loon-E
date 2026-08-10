@@ -113,7 +113,7 @@ class Task(Node):
 
         else:
             for i in range (len(latitude)):
-                self.path[i] = [latitude[i], longitude[i]]
+                self.path.append([latitude[i], longitude[i]])
 
     #ROS - Publish
     def publish_path(self, data):
@@ -286,10 +286,7 @@ class Task(Node):
         if self.waypoints != []:
             target_heading = self.get_coordinate(self.position, self.waypoints)[1]
             data = [1.0, target_heading, -999.0]
-            self.publish_motor(data)
-
-    def turn(self):
-        
+            self.publish_motor(data)    
 
     def shutdown(self):
         """Stops motor at end of task or if KeyboardInterrupt"""
