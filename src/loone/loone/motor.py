@@ -30,7 +30,7 @@ to that and converts it into proper sensor_msgs/BatteryState messages.
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray
+from std_msgs.msg import Float32MultiArray, Int8MultiArray
 import threading
 import numpy as np
 import time
@@ -99,7 +99,14 @@ class MotorNode(Node):
         self.motor_pub = self.create_publisher(Float32MultiArray, 'motor', 10)
         # Raw INA3221 bus voltages for battery_node to convert into BatteryState messages.
         self.battery_raw_pub = self.create_publisher(Float32MultiArray, 'battery_raw', 10)
+        # Raw autonomy / e-stop line levels. This node already owns board.D12 and
+        # D13 for the status LEDs, and two processes opening the same gpiochip
+        # line fails with "Device or resource busy" under libgpiod, so task.py
+        # reads the switches from here instead of opening them a second time.
+        # task.py fails closed if this goes stale, so publish at a steady rate.
+        self.rc_state_pub = self.create_publisher(Int8MultiArray, 'rc_state', 10)
         self.battery_timer = self.create_timer(timer_period, self.publish_battery_raw)
+        self.rc_state_timer = self.create_timer(timer_period, self.publish_rc_state)
         self.led_timer = self.create_timer(timer_period, self.set_led)
         self.get_logger().info('busio_node ready.')
 
@@ -210,6 +217,17 @@ class MotorNode(Node):
             self.ina[2].bus_voltage,
         ]
         self.battery_raw_pub.publish(msg)
+
+    def publish_rc_state(self) -> None:
+        """Publish the raw autonomy / e-stop line levels as [auto, estop].
+
+        The levels are published raw; task.py maps them through its
+        auto_active_high / estop_clear_high parameters so the switch sense can
+        be corrected from YAML without touching this node.
+        """
+        msg = Int8MultiArray()
+        msg.data = [int(self.auto_pin.value), int(self.estop_pin.value)]
+        self.rc_state_pub.publish(msg)
 
     def set_led(self):
         match self.led_state:
@@ -339,6 +357,10 @@ class MotorNode(Node):
         current_time = time.time()        
         current_error = self.convert(self.convert(self.current_heading) - self.target_heading)
         dt = current_time - self.last_time
+        # Two commands arriving inside the same clock tick gave dt = 0 and a
+        # ZeroDivisionError in the middle of the control loop.
+        if dt <= 0.0:
+            return
         de = (current_error - self.last_error) / dt
 
         if abs(current_error) <= 45:
