@@ -54,24 +54,6 @@ def generate_launch_description():
             condition=UnlessCondition(sim),
         )
 
-    # parameters for navsat; it's the gps localization transform
-    navsat_transform_params = os.path.join(loone_share, 'config', 'navsat_transform.yaml')
-
-    navsat_transform = Node(
-        package='robot_localization',
-        executable='navsat_transform_node',
-        name='navsat_transform',
-        output='screen',
-        parameters=[navsat_transform_params, {'use_sim_time': use_sim_time}],
-        remappings=[
-            ('gps/fix', '/navsatfix'),
-            # TODO(team): verify against the ZED wrapper's actual topic names if you
-            # change the camera_name/zed_node_name launch args (defaults: zedx/zed_node).
-            ('imu/data', ['/', camera_name, '/', zed_node_name, '/imu/data']),
-            ('odometry/filtered', ['/', camera_name, '/', zed_node_name, '/odom']),
-        ],
-    )
-
     task = Node(
         package='loone',
         executable='task',
@@ -109,5 +91,4 @@ def generate_launch_description():
         phone,
         battery_node,
         slam_launch,
-        navsat_transform,
     ])

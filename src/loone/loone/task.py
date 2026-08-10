@@ -11,15 +11,6 @@ import math
 import board
 import digitalio
 
-#Fill with object IDs from model
-GREEN = 0
-RED = 1
-NORTH = 2
-EAST = 3
-SOUTH = 4
-WEST = 5
-OTTER = 6
-
 class Task(Node):
     """
     A ROS2 node that acts as the central control node for the Loon-E.
@@ -83,10 +74,10 @@ class Task(Node):
         self.position = np.array([[-999, -999]]) # Current GPS position
         self.heading = -999 # Current Heading
         self.objects = [-999] # Current objects in view
-        self.locations = [[-999, -999, -999]] # Current position of objects in [x, y, z]
+        self.locations = [[-999, -999]] # Current position of objects in [x, y, z]
         self.res = -999
         self.origin = np.array([-999, -999])
-        self.global_position = np.array([-999, -999]) # Current position in global map
+        self.global_position = np.array([0, 0]) # Current position in global map
         self.waypoints = np.array([[-999, -999]]) # Path to destination
         self.buoy_list = []
         self.target_heading = -999
@@ -308,19 +299,19 @@ class Task(Node):
                 self.drive()
 
                 for i in range(len(self.image_objects)): #Search for closest object of each type
-                    if self.image_objects[i] == RED and self.locations[i][2] < buoy_loc[2]:
-                        buoy_type = RED
+                    if self.image_objects[i] == 'red' and self.locations[i][0] < buoy_loc[0]:
+                        buoy_type = self.image_objects[i]
                         buoy_loc = self.locations[i]
 
-                    elif self.image_objects[i] == GREEN and self.locations[i][2] < buoy_loc[2]:
-                        buoy_type = GREEN
+                    elif self.image_objects[i] == 'green' and self.locations[i][0] < buoy_loc[0]:
+                        buoy_type = self.image_objects[i]
                         buoy_loc = self.locations[i]
                 
                 if buoy_type != 0: #If marker was detected
                     waypoints = [self.global_position, (buoy_loc[0], buoy_loc[1])]
                     coord = self.get_coordinate(self.position, waypoints)[0]
                     if not self.buoy_in_list(coord):
-                        if buoy_type == RED:
+                        if buoy_type == 'red':
                             coord[1] += 0.00008
                         else:
                             coord[1] -= 0.00008
@@ -340,22 +331,22 @@ class Task(Node):
             case 0: #Go to destination, checking for Otter
                 self.drive()
 
-                if self.check_change(OTTER, True):
+                if self.check_change('otter', True):
                     for i in self.objects: #Find otter in objects to get its position
-                        if i == OTTER:
+                        if i == 'otter':
                             index = i
                             break
 
                     #check x position of otter
-                    if self.locations[index][0] < self.camera_fov * margin:
+                    if self.locations[index][1] > self.camera_fov * margin:
                         self.stage = 20
-                    elif self.location[index][0] > self.camera_fov * (1 - margin):
+                    elif self.location[index][1] < self.camera_fov * (1 - margin):
                         self.stage = 12
                     else:
                         buoy_loc = (0, len(self.map))
 
                         for i in range(len(self.image_objects)): #Search for closest object of each type
-                            if self.image_objects[i] == RED and self.locations[i][2] < buoy_loc[2]:
+                            if self.image_objects[i] == 'red' and self.locations[i][0] < buoy_loc[0]:
                                 buoy_loc = self.locations[i]
 
                         waypoints = [self.global_position, (buoy_loc[0], buoy_loc[1] + 3)]
@@ -375,7 +366,7 @@ class Task(Node):
                 data = [0.0, -999.0, -999.0]
                 self.publish_motor(data)
                 
-                if self.check_change(OTTER, False):
+                if self.check_change('otter', False):
                     self.stage = 20
             
             case 20: #Go to destination
@@ -457,7 +448,6 @@ class Task(Node):
 
     def run_task(self):
         """Wait to receive data, execute task when data received, and clear event status when task executed"""
-
         while True:
             #Spin until data is received
             while not (self.object_data_ready_event.is_set() # True if new data received
@@ -466,6 +456,7 @@ class Task(Node):
                        and not self.auto_pin.value # True if boat in RC mode
                        and not self.estop_pin.value): # True if estop on
                 rclpy.spin_once(self, timeout_sec = 0.1)
+            self.get_logger().info("Ready!")
 
             match self.task:
                 case 0: self.task_0()
@@ -490,8 +481,8 @@ class Task(Node):
         """
         # Store ZED label IDs for task logic and keep each object's reported
         # position alongside it for the stage logic that reasons about location.
-        self.objects = [obj.label_id for obj in msg.objects]
-        self.locations = [[obj.position.x, obj.position.y, obj.position.z] for obj in msg.objects]
+        self.objects = [obj.label for obj in msg.objects]
+        self.locations = [[obj.position[0], obj.position[1]] for obj in msg.objects]
         self.get_logger().info(f"Objects: {self.objects}")
         self.get_logger().info(f"Locations: {self.locations}")
         self.object_data_ready_event.set()
@@ -514,6 +505,7 @@ class Task(Node):
         self.phone_data_ready_event.set()
     
     def map_callback(self, msg: OccupancyGrid) -> None:
+        self.get_logger().info("Map data received")
         self.res = msg.info.resolution
         self.origin[0] = msg.info.origin.position.y
         self.origin[1] = msg.info.origin.position.x
@@ -528,9 +520,10 @@ class Task(Node):
                 index 1 is horizontal position in global map
         """
         data = msg.pose
+        self.get_logger().info(f"Pose data received")
         if self.map_data_ready_event:
             self.global_position[0] = (data.position.y - self.origin[0]) / self.res
-            self.gloabl_position[1] = (data.position.x - self.origin[1]) / self.res
+            self.global_position[1] = (data.position.x - self.origin[1]) / self.res
             self.get_logger().info(f"Position: {self.global_position}")
         
         self.position_data_ready_event.set()
