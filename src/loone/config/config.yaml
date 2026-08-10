@@ -1,10 +1,12 @@
 # Configurations
 /task:
   ros_parameters:
-    task: [0] # List of tasks to be performed
-    latitude: [] # List of GPS latitudes
-    longitude: [] # List of GPS longitudes
+    task: [1.1] # List of tasks to be performed
+    latitude: [63.4420522, 63.442353, 63.4424279] # List of GPS latitudes
+    longitude: [10.4239289, 10.4237452, 10.4243540] # List of GPS longitudes
     camera_fov: 40 # Expected horizontal distance visible in camera frame
+    has_map: False
+    has_camera: False
     
 /phone:
   ros_parameters:

@@ -8,8 +8,6 @@ import threading
 import numpy as np
 import time
 import math
-import board
-import digitalio
 
 class Task(Node):
     """
@@ -49,10 +47,12 @@ class Task(Node):
         self.path_sub = self.create_subscription(Polygon, 'path', self.path_callback, 10)
         
         #Declare parameters with fallback/default values
-        self.declare_parameter('task', [1])
+        self.declare_parameter('task', [1.1])
         self.declare_parameter('latitude', [63.4420522, 63.442353, 63.4424279])
         self.declare_parameter('longitude', [10.4239289, 10.4237452, 10.4243540])
         self.declare_parameter('camera_fov', 20)
+        self.declare_parameter('has_map', False)
+        self.declare_parameter('has_camera', False)
         
         # Retrieve Parameters
         self.task = self.get_parameter('task').value
@@ -60,11 +60,8 @@ class Task(Node):
         longitude = self.get_parameter('longitude').value
         self.get_path(latitude, longitude) # Merge lists
         self.camera_fov = self.get_parameter('camera_fov').value
-
-        self.auto_pin = digitalio.DigitalInOut(board.D12)
-        self.auto_pin.direction = digitalio.Direction.INPUT
-        self.estop_pin = digitalio.DigitalInOut(board.D13)
-        self.estop_pin.direcftion = digitalio.Direction.INPUT
+        self.has_map = self.get_parameter('has_map').value
+        self.has_camera = self.get_parameter('has_camera').value
 
         #Other internal variables
         self.i = 0 # Current target GPS coordinate
@@ -222,8 +219,9 @@ class Task(Node):
         y = round((start[0] - end[0]) * 111000 / self.res)
         x = round((start[1] - end[1]) * 111000 * math.cos(lat) / self.res)
         target_position = [self.global_position[0] + y, self.global_position[1] + x]
+        heading = math.degrees(math.atan2(x, y))
         
-        return target_position
+        return target_position, heading
     
     def get_coordinate(self, current_position, waypoints):
         """Get position and heading from coordinate and relative position in map.
@@ -264,20 +262,25 @@ class Task(Node):
     def drive(self):
         """Self-driving control loop"""
         #Calculate target position in global map
-        target_position = self.get_map_cell(self.position, self.path[self.i])
-        data = [self.global_position, target_position]
-        self.publish_path(data)
+        self.get_logger().info(f"{self.position}, {self.path[i]}")
+        target_position, target_heading = self.get_map_cell(self.position, self.path[self.i])
+        self.get_logger().info(f"{target_position}, {target_heading}")
         
-        #Wait for path planning to be completed
-        while not self.path_data_ready_event.is_set():
-            rclpy.spin_once(self, timeout_sec = 0.1)
-        self.path_data_ready_event.clear()
+        if self.has_map:
+            data = [self.global_position, target_position]
+            self.publish_path(data)
+            
+            #Wait for path planning to be completed
+            while not self.path_data_ready_event.is_set():
+                rclpy.spin_once(self, timeout_sec = 0.1)
+            self.path_data_ready_event.clear()
 
-        #Send command to Motor Node
-        if self.waypoints != []:
-            target_heading = self.get_coordinate(self.position, self.waypoints)[1]
-            data = [1.0, target_heading, -999.0]
-            self.publish_motor(data)    
+            #Send command to Motor Node
+            if self.waypoints != []:
+                target_heading = self.get_coordinate(self.position, self.waypoints)[1]
+    
+        data = [1.0, target_heading, -999.0]
+        self.publish_motor(data)
 
     def shutdown(self):
         """Stops motor at end of task or if KeyboardInterrupt"""
@@ -290,8 +293,20 @@ class Task(Node):
         data = [1.0, 170.0, -999.0]
         self.publish_motor(data)
     
-    def task_1(self):
-        """Maneuvering and Path Finding"""
+    def task_1a(self):
+        """Maneuvering"""
+        self.get_logger().info("Ready!")
+        match self.stage:
+            case 0: #Drive
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.i += 1
+                    if self.i == len(self.path): #Final waypoint
+                        self.shutdown()
+
+    def task_1b(self):
+        """Path Finding"""
         match self.stage:
             case 0: #Drive
                 buoy_type = 0
@@ -446,25 +461,33 @@ class Task(Node):
 
         return
 
+    def ready(self):
+        ready = True
+        if self.has_map and not self.position_data_ready_event.is_set():
+            ready = False
+        
+        if self.has_camera and not self.object_data_ready_event.is_set():
+            ready = False
+        
+        return ready 
+
     def run_task(self):
         """Wait to receive data, execute task when data received, and clear event status when task executed"""
         while True:
             #Spin until data is received
-            while not (self.object_data_ready_event.is_set() # True if new data received
-                       and self.phone_data_ready_event.is_set() # True if new data received
-                       and self.position_data_ready_event.is_set() # True if new data received
-                       and not self.auto_pin.value # True if boat in RC mode
-                       and not self.estop_pin.value): # True if estop on
+            '''
+            while not self.ready():
                 rclpy.spin_once(self, timeout_sec = 0.1)
-            self.get_logger().info("Ready!")
-
-            match self.task:
-                case 0: self.task_0()
-                case 1: self.task_1()
-                case 2: self.task_2()
+            '''
+            self.get_logger().info(f"bingus Run task function {self.task[0]}")
+            match self.task[0]:
+                case 0.0: self.task_0()
+                case 1.1: self.task_1a()
+                case 1.2: self.task_1b()
+                case 2.0: self.task_2()
                 case 3.1: self.task_3a()
                 case 3.2: self.task_3b()
-                case 4: self.task_4()
+                case 4.0: self.task_4()
             
             #Clear to wait until next set of data is received - May cause problem
             self.object_data_ready_event.clear()
