@@ -29,6 +29,11 @@
     rudder_min: 1220  # Rudder servo min pulse width (µs)
     rudder_max: 1820  # Rudder servo max pulse width (µs)
 
+/path_planning:
+  ros_parameters:
+    dist: 4
+    radius: 2
+
 /battery_node:
   ros_parameters:
     dw_min: 15        # Min voltage of Dewalt battery

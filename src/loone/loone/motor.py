@@ -69,9 +69,9 @@ class MotorNode(Node):
         self.declare_parameter('rudder_min', 1220)  # rudder servo min pulse (us)
         self.declare_parameter('rudder_max', 1820)  # rudder servo max pulse (us)
         self.declare_parameter('center', 0.5)   # propeller fraction = no thrust
-        self.declare_parameter('kp', 1.0)
-        self.declare_parameter('ki', 0.0)
-        self.declare_parameter('kd', 0.0)
+        self.declare_parameter('kp', 2.0)
+        self.declare_parameter('ki', 0.5)
+        self.declare_parameter('kd', 0.02)
         self.declare_parameter('max', 45.0)
         self.declare_parameter('diff', 0.05)
         
