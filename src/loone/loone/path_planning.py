@@ -12,6 +12,10 @@ class Path(Node):
     and publishes a Int8MultiArray message containing the waypoints at a regular interval.
     """
 
+    # Cap on how many times get_path may push the goal cell away from obstacles
+    # before giving up, so an unreachable goal cannot spin forever.
+    MAX_ENDPOINT_NUDGES = 32
+
     def __init__(self):
         """ Initialize the Path node and set up the publisher and subscriptions. """
         super().__init__('Path_PubSub')
@@ -19,7 +23,10 @@ class Path(Node):
         #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'path', 10)
         # Pass the callback function itself; ROS invokes it later when a map arrives.
-        self.map_sub = self.create_subscription(OccupancyGrid, 'global', self.map_callback, 10)
+        # SLAM Toolbox publishes the occupancy grid on /map. This node used to
+        # subscribe to 'global', which nothing publishes, so it never received a
+        # map, never published a path, and left task.drive() blocked forever.
+        self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         # Pass the callback function itself; ROS invokes it when a task path arrives.
         self.task_sub = self.create_subscription(Polygon, 'task_path', self.task_callback, 10)
 
@@ -67,10 +74,13 @@ class Path(Node):
         rows = len(self.map)
         cols = len(self.map[0])
         output = False
-        
-        if 0 <= position[0] < cols and 0 <= position[1] < rows: #If desired area to search is within map bounds
+
+        # position is (y, x): y indexes rows and x indexes columns. These were
+        # compared against the opposite bound, which only happened to work on a
+        # square map -- SLAM grids rarely are.
+        if 0 <= position[0] < rows and 0 <= position[1] < cols: #If desired area to search is within map bounds
             output = True
-        
+
         return output
 
     def find_obstacle(self, point: tuple) -> bool:
@@ -253,13 +263,28 @@ class Path(Node):
         """
         Generate the path from start to end, not avoiding obstacles.
         """
+        # Reset per-request state. These lists were only initialized in
+        # __init__, so every request after the first appended to the previous
+        # one and the published path grew without bound.
+        self.path = []
+        self.path_obstacles = []
+        self.waypoints = []
+
         #Defensive Checks
-        while self.find_obstacle((self.y_end, self.x_end)): #Ensure that end point is not near obstacle
-            # Use the local helper name; this returns the obstacle offset used to nudge the endpoint.
-            y, x = self.get_obstacle((self.y_end, self.x_end))
-            self.y_end = self.y_end + y #Move point in direction opposite average of nearby obstacles
-            self.x_end = self.x_end + x
-        
+        # Ensure that the end point is not near an obstacle. get_obstacle returns
+        # the nudged *absolute* cell, not an offset -- the old code added it to
+        # the endpoint, roughly doubling the coordinate each pass and running the
+        # goal off the map. The iteration cap stops a cell that can never be
+        # cleared (e.g. fully enclosed) from hanging the node.
+        for _ in range(self.MAX_ENDPOINT_NUDGES):
+            if not self.find_obstacle((self.y_end, self.x_end)):
+                break
+            y, x = self.get_obstacle((self.y_end, self.x_end)) #Move point in direction opposite average of nearby obstacles
+            self.y_end = int(round(y))
+            self.x_end = int(round(x))
+        else:
+            self.get_logger().warning("Could not find a clear goal cell; planning to it anyway.")
+
         dx = self.x_end - self.x_start #change in x
         dy = self.y_end - self.y_start #change in y
 
@@ -295,10 +320,16 @@ class Path(Node):
         """ Callback function for the task subscription. Updates the start and end positions. """
         # Polygon messages expose their coordinates through points, not raw data.
         self.get_logger().info(f"Task: {msg.points}")
-        self.y_start = msg.points[0].y
-        self.x_start = msg.points[0].x
-        self.y_end = msg.points[1].y
-        self.x_end = msg.points[1].x
+        if len(msg.points) < 2:
+            self.get_logger().warning("Task path needs a start and an end point.")
+            return
+
+        # Point32 fields are float32, but these are map cell indices and are fed
+        # straight into range() below, which rejects floats with a TypeError.
+        self.y_start = int(round(msg.points[0].y))
+        self.x_start = int(round(msg.points[0].x))
+        self.y_end = int(round(msg.points[1].y))
+        self.x_end = int(round(msg.points[1].x))
         if self.map is not None and self.map.size > 0:
             self.get_path()
     
