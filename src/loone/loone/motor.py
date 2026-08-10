@@ -81,6 +81,7 @@ class MotorNode(Node):
         prop_max = self.get_parameter('prop_max').value
         rudder_min = self.get_parameter('rudder_min').value
         rudder_max = self.get_parameter('rudder_max').value
+        self.factor = self.get_parameter('factor').value
         self.center = self.get_parameter('center').value
         self.kp    = self.get_parameter('kp').value
         self.ki    = self.get_parameter('ki').value
@@ -231,7 +232,15 @@ class MotorNode(Node):
     def publish_motor(self) -> None:
         # Publish the current motor state
         msg = Float32MultiArray()
-        msg.data = [self.prop_l.fraction, self.prop_r.fraction, self.rudder.fraction]
+        msg.data = [
+            self.prop_l.fraction,
+            self.prop_r.fraction,
+            # The rudder servo is disconnected (see the commented-out channel 2 in
+            # _init_servos), so there is no real fraction to report. Publish the neutral
+            # placeholder to keep the [left, right, rudder] wire format stable, and swap
+            # this back to `self.rudder.fraction` when the hardware is repaired.
+            0.5,
+        ]
         self.motor_pub.publish(msg)
         self.get_logger().info(f"Motor: {msg.data}")
 
