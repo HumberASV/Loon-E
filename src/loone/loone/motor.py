@@ -69,9 +69,9 @@ class MotorNode(Node):
         self.declare_parameter('rudder_min', 1220)  # rudder servo min pulse (us)
         self.declare_parameter('rudder_max', 1820)  # rudder servo max pulse (us)
         self.declare_parameter('center', 0.5)   # propeller fraction = no thrust
-        self.declare_parameter('kp', 1.0)
-        self.declare_parameter('ki', 0.0)
-        self.declare_parameter('kd', 0.0)
+        self.declare_parameter('kp', 2.0)
+        self.declare_parameter('ki', 0.5)
+        self.declare_parameter('kd', 0.02)
         self.declare_parameter('max', 45.0)
         self.declare_parameter('diff', 0.05)
         
@@ -299,8 +299,8 @@ class MotorNode(Node):
     
     def reverse(self) -> None:
         """Set PWM to move backwards"""
-        self.prop_l.fraction = 0 #max backward
-        self.prop_r.fraction = 0 #max backward
+        self.prop_l.fraction = 0.4 # backward
+        self.prop_r.fraction = 0.4 # backward
         #self.rudder.fraction = self.center #0 degrees
         self.publish_motor()
     
@@ -328,7 +328,7 @@ class MotorNode(Node):
     def drive(self) -> None:
         """Run one PID control cycle and update propeller and rudder PWM outputs."""
         current_time = time.time()        
-        current_error = self.convert(self.target_heading - self.convert(self.current_heading))
+        current_error = self.convert(self.convert(self.current_heading) - self.target_heading)
         dt = current_time - self.last_time
         de = (current_error - self.last_error) / dt
 
@@ -429,7 +429,6 @@ class MotorNode(Node):
             self._apply(dict(self.joint_neutral))
         finally:
             self.pca.deinit()
-            GPIO.cleanup()
 
 
 def main(args=None) -> None:

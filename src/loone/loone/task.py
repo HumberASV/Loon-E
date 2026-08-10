@@ -51,7 +51,7 @@ class Task(Node):
         self.motor_pub = self.create_publisher(Float32MultiArray, 'task_motor', 10)
         # ZED now provides both object IDs and object positions, so the task
         # node no longer needs the separate locations topic.
-        self.objects_sub = self.create_subscription(ObjectsStamped, 'objects', self.object_callback, 10)
+        self.objects_sub = self.create_subscription(ObjectsStamped, '/zedx/zed_node/obj_det/objects', self.object_callback, 10)
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
         self.map_sub = self.create_subscription(OccupancyGrid, '/map', self.map_callback, 10)
         self.position_sub = self.create_subscription(PoseStamped, '/pose', self.position_callback, 10)
@@ -89,6 +89,7 @@ class Task(Node):
         self.global_position = np.array([-999, -999]) # Current position in global map
         self.waypoints = np.array([[-999, -999]]) # Path to destination
         self.buoy_list = []
+        self.target_heading = -999
 
         #Thread
         self.receiver = threading.Thread(target = self.run_task, daemon = True)
@@ -190,7 +191,7 @@ class Task(Node):
 
         return arrived
 
-    def check_heading(self, target_heading):
+    def check_heading(self):
         """Checks if Loon-E is within 45 degrees of target angle.
         Turns toward target angle if this is not the case.
         
@@ -200,7 +201,7 @@ class Task(Node):
         Returns True if Loon-E within 45 degrees of target angle and False otherwise.
         """
         good_heading = True
-        d_heading = self.convert(self.convert(self.heading) - target_heading)
+        d_heading = self.convert(self.convert(self.heading) - self.target_heading)
 
         if d_heading > 180: #Wrap to [-180, 180]
             d_heading -= 360
@@ -286,6 +287,9 @@ class Task(Node):
             target_heading = self.get_coordinate(self.position, self.waypoints)[1]
             data = [1.0, target_heading, -999.0]
             self.publish_motor(data)
+
+    def turn(self):
+        
 
     def shutdown(self):
         """Stops motor at end of task or if KeyboardInterrupt"""
@@ -383,8 +387,69 @@ class Task(Node):
                 if self.arrived(self.i):
                     self.shutdown()
 
-    def task_3(self):
-        """Docking"""
+    def task_3a(self):
+        """Forward Docking"""
+        match self.stage:
+            case 0:
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.i += 1
+                    #Scan AR tag and place two new GPS points
+                    self.stage = 10
+            
+            case 10:
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.i += 1
+                    time.sleep(10)
+                    data = [-1.0, -999.0, -999.0]
+                    self.publish_motor(data)
+                    time.sleep(10)
+
+                    self.stage = 20
+
+            case 20:
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.shutdown()
+                
+        return
+
+    def task_3b(self):
+        """Parallel Docking"""
+        match self.stage:
+            case 0:
+                self.drive()
+
+                if self.arrived(self.i):
+                    #Scan AR tag and place GPS point
+                    self.stage = 10
+        
+            case 10:
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.target_heading = self.current_heading + 90
+                    self.stage = 20
+
+            case 20:
+                if self.check_heading():
+                    self.target_heading = self.current_heading + 90
+                    time.sleep(5)
+                    self.stage = 30
+
+            case 30:
+                if self.check_heading():
+                    self.stage = 40
+
+            case 40:
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.shutdown()
 
         return
     
@@ -409,7 +474,8 @@ class Task(Node):
                 case 0: self.task_0()
                 case 1: self.task_1()
                 case 2: self.task_2()
-                case 3: self.task_3()
+                case 3.1: self.task_3a()
+                case 3.2: self.task_3b()
                 case 4: self.task_4()
             
             #Clear to wait until next set of data is received - May cause problem
