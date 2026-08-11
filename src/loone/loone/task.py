@@ -85,7 +85,7 @@ class Task(Node):
         # `match` compared a list against ints and never matched any case, so
         # run_task looped forever doing nothing. 31/32 encode tasks 3a/3b,
         # because a float in an int list changes the whole parameter's type.
-        self.declare_parameter('task', 1)
+        self.declare_parameter('task', 0)
         self.declare_parameter('latitude', [63.4420522, 63.442353, 63.4424279])
         self.declare_parameter('longitude', [10.4239289, 10.4237452, 10.4243540])
         self.declare_parameter('camera_fov', 40.0)
