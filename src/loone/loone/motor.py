@@ -88,6 +88,9 @@ class MotorNode(Node):
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
         self.diff = self.get_parameter('diff').value
+
+
+        # self.get_logger().info(f"WOWZERS: {self.get_parameter('max').value}")
         
         # ---- Hardware bring-up (same sequence as motor.py) ----
         self._init_busio(freq)

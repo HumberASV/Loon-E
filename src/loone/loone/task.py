@@ -98,6 +98,7 @@ class Task(Node):
         # LED logic (auto engaged = line high, e-stop clear = line high).
         self.declare_parameter('auto_active_high', True)
         self.declare_parameter('estop_clear_high', True)
+        self.declare_parameter('skip_check', False)
 
         # Retrieve Parameters
         self.task = self.get_parameter('task').value
@@ -108,6 +109,7 @@ class Task(Node):
         objects_topic = self.get_parameter('objects_topic').value
         self.auto_active_high = self.get_parameter('auto_active_high').value
         self.estop_clear_high = self.get_parameter('estop_clear_high').value
+        self.skip_check = self.get_parameter('skip_check').value
 
         # Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
@@ -580,7 +582,6 @@ class Task(Node):
 
     def task_3a(self):
         """Forward Docking.
-
         TODO(team): the AR-tag scan that should generate the bay waypoints is
         not implemented. Until it is, the bay approach and exit have to be
         supplied as ordinary latitude/longitude parameters; the stages below
@@ -718,7 +719,7 @@ class Task(Node):
     def run_task(self):
         """Wait for data, execute one pass of the task, then clear the events."""
         while not self.stop_event.is_set():
-            if not self.wait_for_data():
+            if not (self.wait_for_data() or self.skip_check):
                 return
 
             if self.finished:

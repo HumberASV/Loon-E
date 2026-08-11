@@ -17,6 +17,7 @@
     # and flip these here if the boat arms in the wrong switch position.
     auto_active_high: true
     estop_clear_high: true
+    skip_check: True
 
 
 /phone:
@@ -35,7 +36,7 @@
     kp: 2.0           # PID proportional gain
     ki: 0.5           # PID integral gain
     kd: 0.02           # PID derivative gain
-    max: 45.0         # Max heading error / PID output clamp (degrees)
+    max: 90.0         # Max heading error / PID output clamp (degrees)
 
     prop_min: 1120    # Propeller servo min pulse width (µs)
     prop_max: 1880    # Propeller servo max pulse width (µs)
