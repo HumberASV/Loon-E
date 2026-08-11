@@ -1,10 +1,10 @@
 # Configurations
 /task:
-  ros_parameters:
+  ros__parameters:
     # Task to run. Scalar, not a list: a list never matched the dispatch in
     # task.py. 31 = task 3a (forward docking), 32 = task 3b (parallel docking),
     # because mixing a float into an int list changes the parameter's type.
-    task: 1
+    task: 90
     # GPS course, one entry per waypoint. These must be the same length and
     # non-empty -- task.py raises at startup otherwise.
     latitude: [63.4420522, 63.442353, 63.4424279]
@@ -20,13 +20,13 @@
 
 
 /phone:
-  ros_parameters:
+  ros__parameters:
     phone_port: 5000 # Port on the phone to route to the computer
     computer_port: 5000 # Port on the computer to route to the phone
     host: "127.0.0.1" # Host for the phone node (default is localhost)
 
 /motor:
-  ros_parameters:
+  ros__parameters:
     timer_period: 0.5 # Timer period in seconds
     freq: 50          # PCA9685 PWM frequency in Hz
     factor: 0.75      # Initial propeller throttle factor
@@ -43,12 +43,12 @@
     rudder_max: 1820  # Rudder servo max pulse width (µs)
 
 /path_planning:
-  ros_parameters:
+  ros__parameters:
     dist: 4
     radius: 2
 
 /battery_node:
-  ros_parameters:
+  ros__parameters:
     dw_min: 15        # Min voltage of Dewalt battery
     dw_max: 21        # Max voltage of Dewalt battery
     br_min: 13.2      # Min voltage of Blue Robotics battery

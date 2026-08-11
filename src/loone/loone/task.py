@@ -113,7 +113,7 @@ class Task(Node):
         self.path_pub = self.create_publisher(Polygon, 'task_path', 10)
         # Was 'task_motor', which motor.py does not subscribe to -- every motor
         # command, including the shutdown stop, went nowhere.
-        self.motor_pub = self.create_publisher(Float32MultiArray, 'task', 10)
+        self.motor_pub = self.create_publisher(Float32MultiArray, 'motor_command', 10)
         # ZED provides both labels and positions, so there is no separate
         # locations topic.
         self.objects_sub = self.create_subscription(
@@ -478,8 +478,21 @@ class Task(Node):
         """For PID testing"""
         self.publish_motor([1.0, 170.0, -999.0])
 
-    def task_1(self):
+    def task_1a(self):
         """Maneuvering and Path Finding.
+
+        Follows the GPS course, nudging the current waypoint sideways so the
+        boat passes on the correct side of any red or green gate buoy.
+        """
+        match self.stage:
+            case 0:  # Drive
+                self.drive()
+
+                if self.arrived(self.i):
+                    self.advance_waypoint()
+    
+    def task_1b(self):
+        """Path Finding.
 
         Follows the GPS course, nudging the current waypoint sideways so the
         boat passes on the correct side of any red or green gate buoy.
@@ -716,7 +729,8 @@ class Task(Node):
             # self.task is a scalar int; 31/32 stand in for tasks 3a/3b.
             match self.task:
                 case 0: self.task_0()
-                case 1: self.task_1()
+                case 11: self.task_1a()
+                case 12: self.task_1b()
                 case 2: self.task_2()
                 case 31: self.task_3a()
                 case 32: self.task_3b()
