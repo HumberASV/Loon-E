@@ -123,13 +123,17 @@ def generate_launch_description():
 
     # The name= values must match the top-level keys in config.yaml (/task,
     # /motor, /path_planning) for the parameters to be applied.
-    task = Node(
-        package='loone',
-        executable='task',
-        name='task',
-        output='screen',
-        parameters=[config, {'use_sim_time': use_sim_time}],
-    )
+    # this is commented out because we can just call the node,
+    # we want to send data to the GUI without running task.py,
+    # it's not a blocking node or anything, it's just better to run on separate terminal
+    # so we don't shut down the entire system on tests and hot fixing.
+    # task = Node(
+    #     package='loone',
+    #     executable='task',
+    #     name='task',
+    #     output='screen',
+    #     parameters=[config, {'use_sim_time': use_sim_time}],
+    # )
 
     motor =  Node(
         package='loone',
@@ -162,7 +166,6 @@ def generate_launch_description():
                                     description='Simulation mode: swap busio_node for sim_state_echo '
                                                 '(Isaac Sim drives the actuators).'),
         motor,
-        task,
         path_planning,
         phone,
         battery_node,

@@ -30,7 +30,7 @@ to that and converts it into proper sensor_msgs/BatteryState messages.
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Float32MultiArray, Int8MultiArray
+from std_msgs.msg import Float32MultiArray, Int8MultiArray, ColorRGBA
 import threading
 import numpy as np
 import time
@@ -95,8 +95,9 @@ class MotorNode(Node):
         self._init_led()
 
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
-        self.task_sub = self.create_subscription(Float32MultiArray, 'task', self.task_callback, 10)
+        self.task_sub = self.create_subscription(Float32MultiArray, 'motor_command', self.task_callback, 10)
         self.motor_pub = self.create_publisher(Float32MultiArray, 'motor', 10)
+        self.led_pub = self.create_publisher(ColorRGBA, 'led',10)
         # Raw INA3221 bus voltages for battery_node to convert into BatteryState messages.
         self.battery_raw_pub = self.create_publisher(Float32MultiArray, 'battery_raw', 10)
         # Raw autonomy / e-stop line levels. This node already owns board.D12 and
@@ -107,6 +108,7 @@ class MotorNode(Node):
         self.rc_state_pub = self.create_publisher(Int8MultiArray, 'rc_state', 10)
         self.battery_timer = self.create_timer(timer_period, self.publish_battery_raw)
         self.rc_state_timer = self.create_timer(timer_period, self.publish_rc_state)
+        self.led_state_timer = self.create_timer(timer_period, self.publish_led)
         self.led_timer = self.create_timer(timer_period, self.set_led)
         self.get_logger().info('busio_node ready.')
 
@@ -114,6 +116,13 @@ class MotorNode(Node):
         self.i = 0
         self.last_error = 0
         self.last_time = time.time()
+
+        # LED stuff
+        self.led = ColorRGBA()
+        self.led.r = 0.0
+        self.led.g = 0.0
+        self.led.b = 0.0
+        self.led.a = 0.0
 
         #Other variables from topics
         self.current_speed = np.nan
@@ -232,20 +241,42 @@ class MotorNode(Node):
     def set_led(self):
         match self.led_state:
             case True:
+                # yellow?
                 self.red.duty_cycle = 0x7FFF
+                self.led.r = 1.0 # should be equal to 0x7FFF
+                # TODO(CARSON): probbably should make a conversion function or somthing
                 self.green.duty_cycle = 0x7FFF
+                self.led.g = 1.0
+                
 
                 if not self.estop_pin.value:
+                    # red
                     self.green.duty_cycle = 0x0000
+                    self.led.g = 1.0
                 elif self.auto_pin.value:
+                    # green
                     self.red.duty_cycle = 0x0000
+                    self.led.r = 1.0
 
                 self.led_state = False
 
             case False:
+                # yellow
                 self.red.duty_cycle = 0x0000
+                self.led.r = 0.0
                 self.green.duty_cycle = 0x0000
+                self.led.g = 0.0
                 self.led_state = True
+
+    def publish_led(self) -> None:
+        """Publish the current LED state"""
+        msg = ColorRGBA()
+        msg.r = self.led.r
+        msg.g = self.led.g
+        msg.b = self.led.b
+        msg.a = 1.0
+        self.led_pub.publish(msg)
+        #self.get_logger().info(f"LED: {msg.r}, {msg.g}, {msg.b}, {msg.a}")
 
     def publish_motor(self) -> None:
         # Publish the current motor state

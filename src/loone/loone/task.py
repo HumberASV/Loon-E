@@ -460,7 +460,8 @@ class Task(Node):
 
             match self.task:
                 case 0: self.task_0()
-                case 1: self.task_1()
+                case 11: self.task_1a()
+                case 12: self.task_1b()
                 case 2: self.task_2()
                 case 3.1: self.task_3a()
                 case 3.2: self.task_3b()

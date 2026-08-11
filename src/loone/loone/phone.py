@@ -6,6 +6,7 @@ import numpy as np
 import socket
 import subprocess
 from sensor_msgs.msg import NavSatFix
+from loone_interfaces.msg import Phone
 
 class Phone(Node):
     """
