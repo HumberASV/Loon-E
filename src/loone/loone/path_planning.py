@@ -18,7 +18,7 @@ class Path(Node):
 
     def __init__(self):
         """ Initialize the Path node and set up the publisher and subscriptions. """
-        super().__init__('Path_PubSub')
+        super().__init__('Path_Planning')
 
         #Publishers and Subscribers
         self.path_pub = self.create_publisher(Polygon, 'path', 10)
@@ -42,11 +42,13 @@ class Path(Node):
         self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
 
         #Other variables from topics
-        self.map = np.zeros(0)
+        self.map = np.zeros((20,20))
         self.x_start = np.nan
         self.y_start = np.nan
         self.x_end = np.nan
         self.y_end = np.nan
+
+        self.get_logger().info("Path Planning Node Ready!")
 
     #ROS - Publish
     def publish_path(self):
@@ -55,8 +57,8 @@ class Path(Node):
 
         for position in self.waypoints:
             point = Point32()
-            point.y = position[0]
-            point.x = position[1]
+            point.y = float(position[0])
+            point.x = float(position[1])
             msg.points.append(point)
         
         self.path_pub.publish(msg)
@@ -71,8 +73,7 @@ class Path(Node):
         Returns:
             bool: True if the point is outside the map, False otherwise
         """
-        rows = len(self.map)
-        cols = len(self.map[0])
+        rows, cols = self.map.shape
         output = False
 
         # position is (y, x): y indexes rows and x indexes columns. These were
@@ -313,7 +314,6 @@ class Path(Node):
     #ROS - Subscribe
     def map_callback(self, msg) -> None:
         """ Callback function for the map subscription. Updates the internal map representation. """
-        self.get_logger().info(f"Map: {msg.data}")
         self.map = np.array(msg.data, dtype=np.int8).reshape((msg.info.height, msg.info.width))
 
     def task_callback(self, msg: Polygon) -> None:
@@ -326,10 +326,10 @@ class Path(Node):
 
         # Point32 fields are float32, but these are map cell indices and are fed
         # straight into range() below, which rejects floats with a TypeError.
-        self.y_start = int(round(msg.points[0].y))
-        self.x_start = int(round(msg.points[0].x))
-        self.y_end = int(round(msg.points[1].y))
-        self.x_end = int(round(msg.points[1].x))
+        self.y_start = int(msg.points[0].y)
+        self.x_start = int(msg.points[0].x)
+        self.y_end = int(msg.points[1].y)
+        self.x_end = int(msg.points[1].x)
         if self.map is not None and self.map.size > 0:
             self.get_path()
     

@@ -9,16 +9,16 @@
     # non-empty -- task.py raises at startup otherwise.
     latitude: [63.4420522, 63.442353, 63.4424279]
     longitude: [10.4239289, 10.4237452, 10.4243540]
+    error_lat: 0.00001 # Allowed deviation in latitude from GPS point
+    error_long: 0.00002 # Allowed deviation in longitude from GPS point
     camera_fov: 40.0 # Expected horizontal distance visible in camera frame, metres
     # ZED object detection topic; follows the camera_name/zed_node_name launch args.
     objects_topic: "/zedx/zed_node/obj_det/objects"
     # SAFETY: sense of the switch inputs on board.D12 / D13. Defaults follow
     # motor.py's LED logic (engaged / clear = line high). VERIFY ON THE BENCH
     # and flip these here if the boat arms in the wrong switch position.
-    auto_active_high: true
-    estop_clear_high: true
-    skip_check: True
-
+    has_map: False
+    has_camera: False
 
 /phone:
   ros__parameters:
@@ -30,7 +30,7 @@
   ros__parameters:
     timer_period: 0.5 # Timer period in seconds
     freq: 50          # PCA9685 PWM frequency in Hz
-    factor: 0.75      # Initial propeller throttle factor
+    factor: 0.85      # Initial propeller throttle factor
     center: 0.5      # Rudder center fraction (0 degrees)
 
     kp: 2.0           # PID proportional gain

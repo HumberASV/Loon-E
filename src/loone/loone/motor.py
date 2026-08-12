@@ -73,7 +73,7 @@ class MotorNode(Node):
         self.declare_parameter('ki', 0.5)
         self.declare_parameter('kd', 0.02)
         self.declare_parameter('max', 45.0)
-        self.declare_parameter('diff', 0.05)
+        self.declare_parameter('diff', 0.2)
         
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
@@ -88,9 +88,6 @@ class MotorNode(Node):
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
         self.diff = self.get_parameter('diff').value
-
-
-        # self.get_logger().info(f"WOWZERS: {self.get_parameter('max').value}")
         
         # ---- Hardware bring-up (same sequence as motor.py) ----
         self._init_busio(freq)
@@ -396,7 +393,7 @@ class MotorNode(Node):
         if dt <= 0.0:
             return
         de = (current_error - self.last_error) / dt
-
+        self.get_logger().info(f"{current_error}")
         if abs(current_error) <= 45:
             self.i = self.i + self.ki * current_error
             if self.i < -self.max:
