@@ -19,4 +19,6 @@ def generate_launch_description():
         parameters=[config, {'use_sim_time': use_sim_time}],
     )
 
-    return LaunchDescription([ 
+    return LaunchDescription([
+        task
+    ])
