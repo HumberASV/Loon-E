@@ -252,11 +252,11 @@ class MotorNode(Node):
                 if not self.estop_pin.value:
                     # red
                     self.green.duty_cycle = 0x0000
-                    self.led.g = 1.0
+                    self.led.g = 0.0
                 elif self.auto_pin.value:
                     # green
                     self.red.duty_cycle = 0x0000
-                    self.led.r = 1.0
+                    self.led.r = 0.0
 
                 self.led_state = False
 
