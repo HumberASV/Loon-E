@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 from sensor_msgs.msg import BatteryState
+from loone.battery import battery_voltage
 
 
 # ── Shared fixture ─────────────────────────────────────────────────────────────
@@ -50,6 +51,14 @@ class TestToBatteryState:
 
         assert msg.percentage == 1.0
         assert msg.power_supply_health == BatteryState.POWER_SUPPLY_HEALTH_OVERVOLTAGE
+
+
+def test_battery_voltage_includes_shunt_drop():
+    class Channel:
+        bus_voltage = 15.0
+        shunt_voltage = 125.0
+
+    assert battery_voltage(Channel()) == pytest.approx(15.125)
 
 
 # ── battery_raw_callback() tests ────────────────────────────────────────────────

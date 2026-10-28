@@ -24,8 +24,8 @@ the fractions arrive in JointState.position. (If you switch the URDF interface t
 
 This node also owns the INA3221 (same I2C bus, address 0x41, channels 0/1/2 wired
 to the dwL/dwR/br batteries -- see config.yaml's dw_min/dw_max/br_min/br_max). It
-only publishes the raw bus voltages on 'battery_raw'; battery_node.py subscribes
-to that and converts it into proper sensor_msgs/BatteryState messages.
+publishes battery-side voltages on 'battery_raw'; battery_node.py subscribes to
+that and converts it into proper sensor_msgs/BatteryState messages.
 """
 
 import rclpy
@@ -40,6 +40,7 @@ import digitalio
 from adafruit_ina3221 import INA3221
 from adafruit_motor import servo
 from adafruit_pca9685 import PCA9685
+from loone.battery import battery_voltage
 
 class MotorNode(Node):
     """Drive two propeller ESCs and one rudder servo on a PCA9685 from JointState commands."""
@@ -213,7 +214,7 @@ class MotorNode(Node):
         self.estop_pin.direction = digitalio.Direction.INPUT
         
     def publish_battery_raw(self) -> None:
-        """Publish the three INA3221 bus voltages [dwL, dwR, br], unconverted.
+        """Publish battery-side voltages [dwL, dwR, br] in volts.
 
         battery_node.py subscribes to this and turns it into proper
         sensor_msgs/BatteryState messages (percentage, health, per-battery topics).
@@ -225,9 +226,9 @@ class MotorNode(Node):
                 return
             msg = Float32MultiArray()
             msg.data = [
-                self.ina[0].bus_voltage,
-                self.ina[1].bus_voltage,
-                self.ina[2].bus_voltage,
+                battery_voltage(self.ina[0]),
+                battery_voltage(self.ina[1]),
+                battery_voltage(self.ina[2]),
             ]
             self.battery_raw_pub.publish(msg)
             #self.get_logger().info(f"Publishing battery_raw: {msg.data}")
