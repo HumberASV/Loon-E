@@ -37,6 +37,7 @@ setup(
             'path_planning = loone.path_planning:main',
             'motor = loone.motor:main',
             'battery_node = loone.battery_node:main',
+            'hardware_test = loone.test:main',
         ],
     },
 )
