@@ -57,6 +57,6 @@
         label: 'otter'
         model_class_id: 6
         enabled: true
-        confidence_threshold: 50.0
+        confidence_threshold: 15.0
         is_grounded: true   # Another vessel/obstacle, not anchored
         is_static: false

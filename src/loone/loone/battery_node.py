@@ -73,7 +73,7 @@ class BatteryNode(Node):
         self.prop_l_pub.publish(self._to_battery_state(dw_l, self.dw_min, self.dw_max, 'prop_l'))
         self.prop_r_pub.publish(self._to_battery_state(dw_r, self.dw_min, self.dw_max, 'prop_r'))
         self.main_pub.publish(self._to_battery_state(br, self.br_min, self.br_max, 'main'))
-
+        self.get_logger().info(f"Reveived battery_raw: [{dw_l}, {dw_r}, {br}]")
 
 def main(args=None) -> None:
     """Initialize the ROS2 node and spin."""

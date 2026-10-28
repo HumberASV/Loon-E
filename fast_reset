@@ -1,0 +1,77 @@
+#!/bin/bash
+# Poll a check command instead of sleeping the full worst-case time.
+wait_for() {
+    local timeout=$1; shift
+    local tries=$(( timeout * 5 ))
+    for ((i = 0; i < tries; i++)); do
+        "$@" >/dev/null 2>&1 && return 0
+        sleep 0.2
+    done
+    return 1
+}
+
+zed_is_running() {
+    sudo service zed_x_daemon status 2>/dev/null | grep -qi running
+}
+
+# Stop in reverse dependency order (IMU -> zed -> driver -> nvargus).
+# systemctl/service stop already blocks until the unit is down, so no
+# extra sleeps are needed here.
+echo "stopping IMU_Daemon"
+sudo systemctl stop IMU_Daemon.service
+echo "stopping zed"
+sudo service zed_x_daemon stop
+echo "stopping nvargus"
+sudo systemctl stop nvargus-daemon.service
+
+echo "clearing argus cache"
+sudo rm -rf /tmp/argus_socket
+echo "clearing ipc shared memory"
+sudo ipcrm -a >/dev/null 2>&1
+echo "cache and ipc cleared"
+
+echo "starting nvargus"
+sudo systemctl start nvargus-daemon.service
+if wait_for 5 sudo systemctl is-active --quiet nvargus-daemon.service; then
+    echo "nvargus-daemon is active"
+else
+    echo "ERROR: nvargus-daemon failed to start"
+    sudo systemctl status nvargus-daemon.service --no-pager
+fi
+
+# driver_zed_loader is a oneshot unit (After=nvargus-daemon, Before zed_x_daemon
+# needs it) so it must be reloaded here, before zed_x_daemon starts.
+echo "reloading zed driver"
+sudo service driver_zed_loader start
+if sudo systemctl is-failed --quiet driver_zed_loader.service; then
+    echo "ERROR: driver_zed_loader failed to load"
+    sudo systemctl status driver_zed_loader.service --no-pager
+else
+    echo "zed driver reloaded"
+fi
+
+echo "starting zed"
+sudo service zed_x_daemon start
+if wait_for 8 zed_is_running; then
+    echo "zed_x_daemon is running"
+else
+    echo "ERROR: zed_x_daemon failed to start"
+    sudo service zed_x_daemon status
+fi
+
+echo "starting IMU_Daemon"
+sudo systemctl start IMU_Daemon.service
+if wait_for 3 sudo systemctl is-active --quiet IMU_Daemon.service; then
+    echo "IMU_Daemon is active"
+else
+    echo "ERROR: IMU_Daemon failed to start"
+    sudo systemctl status IMU_Daemon.service --no-pager
+fi
+
+input=$(ZED_Explorer -a 2>&1)
+
+if echo "$input" | grep -q 'State :  "AVAILABLE"'; then
+    echo "Camera is available!"
+else
+    echo "Camera is not available."
+fi

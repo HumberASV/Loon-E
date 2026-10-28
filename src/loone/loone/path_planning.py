@@ -42,7 +42,7 @@ class Path(Node):
         self.radius = self.get_parameter('radius').value #min distance from obstacles, in cells
 
         #Other variables from topics
-        self.map = np.zeros((20,20))
+        self.map = np.zeros((0))
         self.x_start = np.nan
         self.y_start = np.nan
         self.x_end = np.nan

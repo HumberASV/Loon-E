@@ -74,6 +74,7 @@ class MotorNode(Node):
         self.declare_parameter('kd', 0.02)
         self.declare_parameter('max', 45.0)
         self.declare_parameter('diff', 0.2)
+        self.declare_parameter('i2c', True)
         
         timer_period = self.get_parameter('timer_period').value
         freq = self.get_parameter('freq').value
@@ -88,11 +89,13 @@ class MotorNode(Node):
         self.kd    = self.get_parameter('kd').value
         self.max   = self.get_parameter('max').value
         self.diff = self.get_parameter('diff').value
+        self.i2c = self.get_parameter('i2c').value
         
         # ---- Hardware bring-up (same sequence as motor.py) ----
-        self._init_busio(freq)
-        self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
-        self._init_led()
+        if self.i2c:
+            self._init_busio(freq)
+            self._init_servos(prop_min, prop_max, rudder_min, rudder_max)
+            self._init_led()
 
         self.phone_sub = self.create_subscription(Float32MultiArray, 'phone', self.phone_callback, 10)
         self.task_sub = self.create_subscription(Float32MultiArray, 'motor_command', self.task_callback, 10)
@@ -217,15 +220,17 @@ class MotorNode(Node):
 
         No-op if the INA3221 failed to initialize (see _init_busio).
         """
-        if self.ina is None:
-            return
-        msg = Float32MultiArray()
-        msg.data = [
-            self.ina[0].bus_voltage,
-            self.ina[1].bus_voltage,
-            self.ina[2].bus_voltage,
-        ]
-        self.battery_raw_pub.publish(msg)
+        if self.i2c:
+            if self.ina is None:
+                return
+            msg = Float32MultiArray()
+            msg.data = [
+                self.ina[0].bus_voltage,
+                self.ina[1].bus_voltage,
+                self.ina[2].bus_voltage,
+            ]
+            self.battery_raw_pub.publish(msg)
+            #self.get_logger().info(f"Publishing battery_raw: {msg.data}")
 
     def publish_rc_state(self) -> None:
         """Publish the raw autonomy / e-stop line levels as [auto, estop].
@@ -234,39 +239,42 @@ class MotorNode(Node):
         auto_active_high / estop_clear_high parameters so the switch sense can
         be corrected from YAML without touching this node.
         """
-        msg = Int8MultiArray()
-        msg.data = [int(self.auto_pin.value), int(self.estop_pin.value)]
-        self.rc_state_pub.publish(msg)
+        if self.i2c:
+            msg = Int8MultiArray()
+            msg.data = [int(self.auto_pin.value), int(self.estop_pin.value)]
+            self.rc_state_pub.publish(msg)
+            #self.get_logger().info(f"Publishing rc_state: {msg.data}")
 
     def set_led(self):
-        match self.led_state:
-            case True:
-                # yellow?
-                self.red.duty_cycle = 0x7FFF
-                self.led.r = 1.0 # should be equal to 0x7FFF
-                # TODO(CARSON): probbably should make a conversion function or somthing
-                self.green.duty_cycle = 0x7FFF
-                self.led.g = 1.0
-                
+        if self.i2c:
+            match self.led_state:
+                case True:
+                    # Yellow
+                    self.red.duty_cycle = 0xFFFF
+                    self.led.r = 1.0 # should be equal to 0x7FFF
+                    # TODO(CARSON): probbably should make a conversion function or somthing
+                    self.green.duty_cycle = 0xFFFF
+                    self.led.g = 1.0
+                    
 
-                if not self.estop_pin.value:
-                    # red
-                    self.green.duty_cycle = 0x0000
-                    self.led.g = 0.0
-                elif self.auto_pin.value:
-                    # green
+                    if not self.estop_pin.value:
+                        # red
+                        self.green.duty_cycle = 0x0000
+                        self.led.g = 0.0
+                    elif self.auto_pin.value:
+                        # green
+                        self.red.duty_cycle = 0x0000
+                        self.led.r = 0.0
+
+                    self.led_state = False
+
+                case False:
+                    # off
                     self.red.duty_cycle = 0x0000
                     self.led.r = 0.0
-
-                self.led_state = False
-
-            case False:
-                # yellow
-                self.red.duty_cycle = 0x0000
-                self.led.r = 0.0
-                self.green.duty_cycle = 0x0000
-                self.led.g = 0.0
-                self.led_state = True
+                    self.green.duty_cycle = 0x0000
+                    self.led.g = 0.0
+                    self.led_state = True
 
     def publish_led(self) -> None:
         """Publish the current LED state"""
@@ -280,18 +288,19 @@ class MotorNode(Node):
 
     def publish_motor(self) -> None:
         # Publish the current motor state
-        msg = Float32MultiArray()
-        msg.data = [
-            self.prop_l.fraction,
-            self.prop_r.fraction,
-            # The rudder servo is disconnected (see the commented-out channel 2 in
-            # _init_servos), so there is no real fraction to report. Publish the neutral
-            # placeholder to keep the [left, right, rudder] wire format stable, and swap
-            # this back to `self.rudder.fraction` when the hardware is repaired.
-            0.5,
-        ]
-        self.motor_pub.publish(msg)
-        self.get_logger().info(f"Motor: {msg.data}")
+        if self.i2c:
+            msg = Float32MultiArray()
+            msg.data = [
+                self.prop_l.fraction,
+                self.prop_r.fraction,
+                # The rudder servo is disconnected (see the commented-out channel 2 in
+                # _init_servos), so there is no real fraction to report. Publish the neutral
+                # placeholder to keep the [left, right, rudder] wire format stable, and swap
+                # this back to `self.rudder.fraction` when the hardware is repaired.
+                0.5,
+            ]
+            self.motor_pub.publish(msg)
+            self.get_logger().info(f"Motor: {msg.data}")
 
     def convert(self, angle) -> float:
         """Convert a heading angle from [0, 360] to [-180, 180].
@@ -369,6 +378,13 @@ class MotorNode(Node):
         #self.rudder.fraction = self.center #0 degrees
         self.publish_motor()
 
+    def forward(self) -> None:
+        """Set PWM to move forward"""
+        self.prop_l.fraction = 0.6
+        self.prop_r.fraction = 0.6
+        #self.rudder.fraction = self.center #0 degrees
+        self.publish_motor()
+
     def turn_in_place(self) -> None:
         """Set PWM to turn in place"""
         if self.dir == 1: #turn left
@@ -412,12 +428,14 @@ class MotorNode(Node):
             remapped_output = self.remap(output)
 
             if current_error > 0:  # turn right: reduce right propeller
-                self.prop_l.fraction = self.factor
-                self.prop_r.fraction = self.get_fraction(remapped_output) * self.factor
+                if self.i2c:
+                    self.prop_l.fraction = self.factor
+                    self.prop_r.fraction = self.get_fraction(remapped_output) * self.factor
                 self.get_logger().info(f"Sending Right: {remapped_output}")
             else:  # turn left: reduce left propeller
-                self.prop_l.fraction = self.get_fraction(remapped_output) * self.factor
-                self.prop_r.fraction = self.factor
+                if self.i2c:
+                    self.prop_l.fraction = self.get_fraction(remapped_output) * self.factor
+                    self.prop_r.fraction = self.factor
                 self.get_logger().info(f"Sending Left: {remapped_output}")
             '''
             if output < -self.max / 2:
@@ -432,8 +450,9 @@ class MotorNode(Node):
             self.publish_motor()
         
         else:
-            self.dir = np.sign(current_error)
-            self.turn_in_place()
+            if self.i2c:
+                self.dir = np.sign(current_error)
+                self.turn_in_place()
             self.get_logger().info("Turning in place")
     
     def check_data(self) -> None:
@@ -445,12 +464,15 @@ class MotorNode(Node):
             case 0: #stop
                 self.stop()
 
-            case 1: #drive
-                self.drive()
+            case 1: #forward
+                self.forward()
             
             case 2: #turn
                 if self.dir != -999:
                     self.turn_in_place()
+            
+            case 3: #drive
+                self.drive()
 
             case _: #other
                 self.get_logger().info("Improper command, no action")
@@ -495,7 +517,8 @@ class MotorNode(Node):
         except Exception as e:
             self.get_logger().error(f"Failed to neutralize motors on shutdown: {e}")
         finally:
-            self.pca.deinit()
+            if self.i2c:
+                self.pca.deinit()
 
 def main(args=None) -> None:
     """Initialize the ROS2 node and spin."""

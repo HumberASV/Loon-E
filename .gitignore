@@ -8,7 +8,7 @@ __pycache__/
 # IDE files
 .vscode/
 *.swp
-
+zed.deb
 # ros dump
 build/
 install/

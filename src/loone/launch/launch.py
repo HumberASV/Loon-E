@@ -80,7 +80,7 @@ def generate_launch_description():
     robot_state_publisher = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
-        output='screen',
+        output='log',
         parameters=[robot_description, {'use_sim_time': use_sim_time}],
     )
 
@@ -110,7 +110,7 @@ def generate_launch_description():
         package='robot_localization',
         executable='navsat_transform_node',
         name='navsat_transform',
-        output='screen',
+        output='log',
         parameters=[navsat_transform_params, {'use_sim_time': use_sim_time}],
         remappings=[
             ('gps/fix', '/navsatfix'),
@@ -144,14 +144,6 @@ def generate_launch_description():
         condition=UnlessCondition(sim),
     )
 
-    path_planning = Node(
-        package='loone',
-        executable='path_planning',
-        name='path_planning',
-        output='screen',
-        parameters=[config, {'use_sim_time': use_sim_time}],
-    )
-
     # list of above inorder of importance
     return LaunchDescription([
         DeclareLaunchArgument('camera_name', default_value='zedx',
@@ -166,7 +158,6 @@ def generate_launch_description():
                                     description='Simulation mode: swap busio_node for sim_state_echo '
                                                 '(Isaac Sim drives the actuators).'),
         motor,
-        path_planning,
         phone,
         battery_node,
         slam_launch,
